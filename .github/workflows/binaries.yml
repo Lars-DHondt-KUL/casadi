@@ -1,6 +1,6 @@
 name: binaries
 
-on: [push, pull_request]
+on: [pull_request]
 
 env:
   cache-suffix: v18
