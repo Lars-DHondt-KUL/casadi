@@ -1037,8 +1037,8 @@ namespace casadi {
     return ss.str();
   }
 
-  std::string CodeGenerator::array(const std::string& type, const std::string& name, const std::string& len,
-                                   const std::string& def) {
+  std::string CodeGenerator::array(const std::string& type, const std::string& name,
+     const std::string& len, const std::string& def) {
     std::stringstream s;
     s << type << " ";
     if (len=="0") {
@@ -1154,8 +1154,6 @@ namespace casadi {
       *this << s << ".release = 0;\n";
     }
   }
-
-  
 
   std::string CodeGenerator::
   operator()(const Function& f, const std::string& arg,
@@ -2665,7 +2663,7 @@ namespace casadi {
     add_auxiliary(CodeGenerator::AUX_ASSERT);
     return "assert(" + test + ");";
   }
-  
+
   void CodeGenerator::sz_work(size_t& sz_arg, size_t& sz_res, size_t& sz_iw, size_t& sz_w) const {
     sz_arg = sz_res = sz_iw = sz_w = 0;
     for (auto&& f : added_functions_) {

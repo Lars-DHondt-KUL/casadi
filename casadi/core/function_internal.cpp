@@ -2303,7 +2303,8 @@ namespace casadi {
     casadi_error("'get_jacobian' not defined for " + class_name());
   }
 
-  void FunctionInternal::codegen(CodeGenerator& g, const std::string& fname, const Instance& inst) const {
+  void FunctionInternal::codegen(CodeGenerator& g, const std::string& fname,
+     const Instance& inst) const {
     // Define function
     g << "/* " << definition() << " */\n";
     g << "static " << signature(fname) << " {\n";
@@ -2631,7 +2632,8 @@ namespace casadi {
 
 
       // Work vectors and input and output buffers
-      std::string nr = str(sz_w()) + "+" +  str(align_w_) + "/sizeof(casadi_real) + " + str(nnz_in()+nnz_out());
+      std::string nr = str(sz_w()) + "+" +  str(align_w_) + "/sizeof(casadi_real) + "
+        + str(nnz_in()+nnz_out());
       g << CodeGenerator::array("casadi_int", "iw", sz_iw())
         << CodeGenerator::array("casadi_real", "w", nr);
 

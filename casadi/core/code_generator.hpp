@@ -721,8 +721,8 @@ namespace casadi {
                              const std::string& def=std::string());
 
     /** Declare an array */
-    static std::string array(const std::string& type, const std::string& name, const std::string& len,
-                             const std::string& def=std::string());
+    static std::string array(const std::string& type, const std::string& name,
+        const std::string& len, const std::string& def=std::string());
 
     /** \brief  Print casadi_int vector to a c file
 
@@ -874,7 +874,7 @@ namespace casadi {
 
     /** \brief Add an assertion */
     std::string debug_assert(const std::string& test);
-    
+
   private:
 
     // Generate casadi_real definition

@@ -178,7 +178,7 @@ namespace casadi {
 
     /// Alignment (bytes) for specific input argument
     size_t align_w() const override;
-    
+
     /** \brief Serialize an object without type information
 
         \identifier{76} */
