@@ -313,7 +313,7 @@ class CASADI_EXPORT SXFunction :
   /** \brief  Get the size of the work vector, for codegen
 
       \identifier{290} */
-  size_t codegen_sz_w(const CodeGenerator& g, const Instance& inst) const override;
+  size_t codegen_sz_w(const CodeGenerator& g) const override;
 
   /** \brief Generate code for the declarations of the C function
 
