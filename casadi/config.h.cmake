@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -34,10 +34,13 @@
 #define CASADI_FEATURE_LIST "${feature_list}"  // NOLINT(whitespace/line_length)
 #define CASADI_BUILD_TYPE "${CMAKE_BUILD_TYPE}"  // NOLINT(whitespace/line_length)
 #define CASADI_COMPILER_ID "${CMAKE_CXX_COMPILER_ID}"  // NOLINT(whitespace/line_length)
-#define CASADI_COMPILER "${CMAKE_CXX_COMPILER}"  // NOLINT(whitespace/line_length)
+#define CASADI_COMPILER "${CASADI_CMAKE_CXX_COMPILER}"  // NOLINT(whitespace/line_length)
 #define CASADI_COMPILER_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${UPPER_CMAKE_BUILD_TYPE}} ${EXTRA_CXX_FLAGS_FROM_DEFS}"  // NOLINT(whitespace/line_length)
 #define CASADI_MODULES "${CASADI_MODULES}"  // NOLINT(whitespace/line_length)
 #define CASADI_PLUGINS "${CASADI_PLUGINS}"  // NOLINT(whitespace/line_length)
-#define CASADI_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}"  // NOLINT(whitespace/line_length)
+#define CASADI_INSTALL_PREFIX "${CASADI_INSTALL_PREFIX}"  // NOLINT(whitespace/line_length)
+#define CASADI_SHARED_LIBRARY_PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}"  // NOLINT(whitespace/line_length)
+#define CASADI_SHARED_LIBRARY_SUFFIX "${CMAKE_SHARED_LIBRARY_SUFFIX}"  // NOLINT(whitespace/line_length)
+#define CASADI_OBJECT_FILE_SUFFIX "${CMAKE_C_OUTPUT_EXTENSION}"  // NOLINT(whitespace/line_length)
 
 #endif  // CASADI_CONFIG_H // NOLINT(build/header_guard)

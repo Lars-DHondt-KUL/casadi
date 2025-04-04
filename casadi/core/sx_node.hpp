@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -31,7 +31,9 @@
 #include <sstream>
 #include <string>
 
-/** \brief  Scalar expression (which also works as a smart pointer class to this class) */
+/** \brief  Scalar expression (which also works as a smart pointer class to this class)
+
+    \identifier{9s} */
 #include "sx_elem.hpp"
 
 
@@ -39,23 +41,31 @@
 namespace casadi {
 
   /** \brief  Internal node class for SX
+
       \author Joel Andersson
       \date 2010
-  */
+
+      \identifier{9t} */
   class SXNode {
     friend class SXElem;
     friend class Matrix<SXElem>;
     friend class UniversalNodeOwner;
   public:
 
-    /** \brief  constructor */
+    /** \brief  constructor
+
+        \identifier{9u} */
     SXNode();
 
-    /** \brief  destructor  */
+    /** \brief  destructor
+
+        \identifier{9v} */
     virtual ~SXNode();
 
     ///@{
-    /** \brief  check properties of a node */
+    /** \brief  check properties of a node
+
+        \identifier{9w} */
     virtual bool is_constant() const { return false; }
     virtual bool is_integer() const { return false; }
     virtual bool is_symbolic() const { return false; }
@@ -67,10 +77,15 @@ namespace casadi {
     virtual bool is_nan() const { return false; }
     virtual bool is_inf() const { return false; }
     virtual bool is_minus_inf() const { return false; }
+    virtual bool is_call() const { return false; }
+    virtual bool is_output() const { return false; }
+    virtual bool has_output() const { return false; }
     ///@}
 
     ///@{
-    /** \brief  Get value of a constant node */
+    /** \brief  Get value of a constant node
+
+        \identifier{9x} */
     virtual double to_double() const;  // only works for constant nodes
     virtual casadi_int to_int() const;  // only works for integer nodes
     ///@}
@@ -78,38 +93,75 @@ namespace casadi {
     // get the name
     virtual const std::string& name() const;
 
-    /** \brief Get type name */
+    /** \brief Get type name
+
+        \identifier{9y} */
     virtual std::string class_name() const = 0;
 
-    /** \brief get the operation */
+    /** \brief get the operation
+
+        \identifier{9z} */
     virtual casadi_int op() const=0;
 
-    /** \brief Check if two nodes are equivalent up to a given depth */
+    /** \brief  Get called function
+
+        \identifier{291} */
+    virtual Function which_function() const;
+
+    /** \brief  Get function output
+
+        \identifier{292} */
+    virtual casadi_int which_output() const;
+
+    /** \brief Check if two nodes are equivalent up to a given depth
+
+        \identifier{a0} */
     virtual bool is_equal(const SXNode* node, casadi_int depth) const;
 
-    /** \brief  Number of dependencies */
+    /** \brief  Number of dependencies
+
+        \identifier{a1} */
     virtual casadi_int n_dep() const { return 0;}
 
-    /** \brief  get the reference of a child */
+    /** \brief  Get an output
+
+        \identifier{293} */
+    virtual SXElem get_output(casadi_int oind) const;
+
+    /** \brief  get the reference of a child
+
+        \identifier{a2} */
     virtual const SXElem& dep(casadi_int i) const;
 
-    /** \brief  get the reference of a child */
+    /** \brief  get the reference of a child
+
+        \identifier{a3} */
     virtual SXElem& dep(casadi_int i);
 
-    /** \brief  Check if smooth */
+    /** \brief  Check if smooth
+
+        \identifier{a4} */
     virtual bool is_smooth() const { return true; }
 
-    /** \brief  print */
+    /** \brief  print
+
+        \identifier{a5} */
     virtual void disp(std::ostream& stream, bool more) const;
 
-    /** \brief Find out which nodes can be inlined */
+    /** \brief Find out which nodes can be inlined
+
+        \identifier{a6} */
     void can_inline(std::map<const SXNode*, casadi_int>& nodeind) const;
 
-    /** \brief Print compact */
+    /** \brief Print compact
+
+        \identifier{a7} */
     std::string print_compact(std::map<const SXNode*, casadi_int>& nodeind,
                              std::vector<std::string>& intermed) const;
 
-    /** \brief  Print expression */
+    /** \brief  Print expression
+
+        \identifier{a8} */
     virtual std::string print(const std::string& arg1, const std::string& arg2) const = 0;
 
     // Check if marked (i.e. temporary is negative)
@@ -118,11 +170,19 @@ namespace casadi {
     // Mark by flipping the sign of the temporary and decreasing by one
     void mark() const;
 
-    /** \brief Non-recursive delete */
+    /** \brief Non-recursive delete
+
+        \identifier{a9} */
     static void safe_delete(SXNode* n);
 
     // Depth when checking equalities
     static casadi_int eq_depth_;
+
+    /// Get a shared object from the current internal object
+    SXElem shared_from_this();
+
+    /// Get a shared object from the current internal object
+    const SXElem shared_from_this() const;
 
     /** Temporary variables to be used in user algorithms like sorting,
         the user is responsible of making sure that use is thread-safe
@@ -131,9 +191,15 @@ namespace casadi {
     mutable int temp;
 
     // Reference counter -- counts the number of parents of the node
+#ifdef CASADI_WITH_THREADSAFE_SYMBOLICS
+    std::atomic<unsigned int> count;
+#else
     unsigned int count;
+#endif // CASADI_WITH_THREADSAFE_SYMBOLICS
 
-    /** \brief Serialize an object */
+    /** \brief Serialize an object
+
+        \identifier{aa} */
     void serialize(SerializingStream& s) const;
 
     virtual void serialize_node(SerializingStream& s) const;

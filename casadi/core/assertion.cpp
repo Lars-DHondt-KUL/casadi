@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -25,8 +25,6 @@
 
 #include "assertion.hpp"
 #include "serializing_stream.hpp"
-
-using namespace std;
 
 namespace casadi {
 
@@ -62,7 +60,7 @@ namespace casadi {
 
   int Assertion::eval_sx(const SXElem** arg, SXElem** res, casadi_int* iw, SXElem* w) const {
     if (arg[0]!=res[0]) {
-      copy(arg[0], arg[0]+nnz(), res[0]);
+      std::copy(arg[0], arg[0]+nnz(), res[0]);
     }
     return 0;
   }
@@ -74,14 +72,14 @@ namespace casadi {
     }
 
     if (arg[0]!=res[0]) {
-      copy(arg[0], arg[0]+nnz(), res[0]);
+      std::copy(arg[0], arg[0]+nnz(), res[0]);
     }
     return 0;
   }
 
   int Assertion::sp_forward(const bvec_t** arg, bvec_t** res, casadi_int* iw, bvec_t* w) const {
     if (arg[0]!=res[0]) {
-      copy(arg[0], arg[0]+nnz(), res[0]);
+      std::copy(arg[0], arg[0]+nnz(), res[0]);
     }
     return 0;
   }
@@ -101,17 +99,16 @@ namespace casadi {
 
   void Assertion::generate(CodeGenerator& g,
                             const std::vector<casadi_int>& arg,
-                            const std::vector<casadi_int>& res) const {
+                            const std::vector<casadi_int>& res,
+                            const std::vector<bool>& arg_is_ref,
+                            std::vector<bool>& res_is_ref) const {
     // Generate assertion
     g << "if (" << g.workel(arg[1]) << "!=1.) {\n"
       << "    /* " << fail_message_ << " */\n"
       << "    return 1;\n"
       << "  }\n";
 
-    // Copy if not inplace
-    if (arg[0]!=res[0]) {
-      g << g.copy(g.work(arg[0], nnz()), nnz(), g.work(res[0], nnz())) << '\n';
-    }
+    generate_copy(g, arg, res, arg_is_ref, res_is_ref, 0);
   }
 
   void Assertion::serialize_body(SerializingStream& s) const {

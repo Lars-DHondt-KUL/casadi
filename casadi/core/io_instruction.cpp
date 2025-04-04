@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -26,33 +26,45 @@
 #include "io_instruction.hpp"
 #include "serializing_stream.hpp"
 
-using namespace std;
-
 namespace casadi {
   Input::Input(const Sparsity& sp, casadi_int ind, casadi_int segment, casadi_int offset)
     : IOInstruction(ind, segment, offset) {
     set_sparsity(sp);
   }
 
-  string Input::disp(const vector<string>& arg) const {
-    stringstream s;
+  std::string Input::disp(const std::vector<std::string>& arg) const {
+    std::stringstream s;
     s << "input[" << ind_ << "][" << segment_ << "]";
     return s.str();
   }
 
   void Input::generate(CodeGenerator& g,
-                       const vector<casadi_int>& arg, const vector<casadi_int>& res) const {
+      const std::vector<casadi_int>& arg,
+      const std::vector<casadi_int>& res,
+      const std::vector<bool>& arg_is_ref,
+      std::vector<bool>& res_is_ref) const {
     casadi_int nnz = this->nnz();
     if (nnz==0) return; // quick return
-    string a = g.arg(ind_);
+    std::string a = g.arg(ind_);
     casadi_int i = res.front();
     if (nnz==1) {
       g << g.workel(i) << " = " << a << " ? " << a << "[" << offset_ << "] : 0;\n";
     } else if (offset_==0) {
-      g << g.copy(a, nnz, g.work(i, nnz)) << "\n";
+      if (g.elide_copy(nnz)) {
+        g << g.work(i, nnz, true) << " = " << a << " ? " << a << " : " << g.zeros(nnz) << ";\n";
+        res_is_ref[0] = true;
+      } else {
+        g << g.copy(a, nnz, g.work(i, nnz, false)) << "\n";
+      }
     } else {
-      g << g.copy(a + " ? " + a + "+" + str(offset_) + " : 0",
-                          nnz, g.work(i, nnz)) << "\n";
+      if (g.elide_copy(nnz)) {
+        g << g.work(i, nnz, true) << " = " << a << " ? " << a + "+" + str(offset_)
+          << " : " << g.zeros(nnz) << ";\n";
+        res_is_ref[0] = true;
+      } else {
+        g << g.copy(a + " ? " + a + "+" + str(offset_) + " : 0",
+                            nnz, g.work(i, nnz, false)) << "\n";
+      }
     }
   }
 
@@ -61,25 +73,28 @@ namespace casadi {
     set_dep(x);
   }
 
-  string Output::disp(const vector<string>& arg) const {
-    stringstream s;
+  std::string Output::disp(const std::vector<std::string>& arg) const {
+    std::stringstream s;
     s << "output[" << ind_ << "][" << segment_ << "]";
     return s.str();
   }
 
   void Output::generate(CodeGenerator& g,
-                       const vector<casadi_int>& arg, const vector<casadi_int>& res) const {
+      const std::vector<casadi_int>& arg,
+      const std::vector<casadi_int>& res,
+      const std::vector<bool>& arg_is_ref,
+      std::vector<bool>& res_is_ref) const {
     casadi_int nnz = dep().nnz();
     if (nnz==0) return; // quick return
     casadi_int i = arg.front();
-    string r = g.res(ind_);
+    std::string r = g.res(ind_);
     if (nnz==1) {
       g << "if (" << r << ") " << r << "[" << offset_ << "] = " << g.workel(i) << ";\n";
     } else if (offset_==0) {
-      g << g.copy(g.work(i, nnz), nnz, r) << "\n";
+      g << g.copy(g.work(i, nnz, arg_is_ref[0]), nnz, r) << "\n";
     } else {
       g << "if (" << r << ") "
-        << g.copy(g.work(i, nnz), nnz, r + "+" + str(offset_)) << "\n";
+        << g.copy(g.work(i, nnz, arg_is_ref[0]), nnz, r + "+" + str(offset_)) << "\n";
     }
 
   }

@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -28,5 +28,37 @@
 
       const std::string casadi::BSplineInterpolant::meta_doc=
       "\n"
+"\n"
+"\n"
+"Extra doc: https://github.com/casadi/casadi/wiki/L_239 \n"
+"\n"
+"\n"
+">List of available options\n"
+"\n"
+"+-----------------------+--------------+-----------------------------------+\n"
+"|          Id           |     Type     |            Description            |\n"
+"+=======================+==============+===================================+\n"
+"| algorithm             | OT_STRING    | Algorithm used for fitting the    |\n"
+"|                       |              | data: 'not_a_knot' (default, same |\n"
+"|                       |              | as Matlab), 'smooth_linear'.      |\n"
+"+-----------------------+--------------+-----------------------------------+\n"
+"| degree                | OT_INTVECTOR | Sets, for each grid dimension,    |\n"
+"|                       |              | the degree of the spline.         |\n"
+"+-----------------------+--------------+-----------------------------------+\n"
+"| linear_solver         | OT_STRING    | Solver used for constructing the  |\n"
+"|                       |              | coefficient tensor.               |\n"
+"+-----------------------+--------------+-----------------------------------+\n"
+"| linear_solver_options | OT_DICT      | Options to be passed to the       |\n"
+"|                       |              | linear solver.                    |\n"
+"+-----------------------+--------------+-----------------------------------+\n"
+"| smooth_linear_frac    | OT_DOUBLE    | When 'smooth_linear' algorithm is |\n"
+"|                       |              | active, determines sharpness      |\n"
+"|                       |              | between 0 (sharp, as linear       |\n"
+"|                       |              | interpolation) and 0.5            |\n"
+"|                       |              | (smooth).Default value is 0.1.    |\n"
+"+-----------------------+--------------+-----------------------------------+\n"
+"\n"
+"\n"
+"\n"
 "\n"
 ;

@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -25,7 +25,6 @@
 
 #include "convexify.hpp"
 
-using namespace std;
 namespace casadi {
 
   std::string strategy_to_string(casadi_convexify_strategy_t s) {
@@ -109,7 +108,8 @@ namespace casadi {
     deserialize(s, "", convexify_data_);
   }
 
-  void Convexify::serialize(SerializingStream& s, const std::string& prefix, const ConvexifyData& d) {
+  void Convexify::serialize(SerializingStream& s, const std::string& prefix,
+      const ConvexifyData& d) {
     s.version(prefix + "Convexify", 1);
     s.pack(prefix + "Convexify::type_in", static_cast<int>(d.config.type_in));
     s.pack(prefix + "Convexify::strategy", static_cast<int>(d.config.strategy));
@@ -124,7 +124,8 @@ namespace casadi {
     s.pack(prefix + "Convexify::Hrsp", d.Hrsp);
   }
 
-  void Convexify::deserialize(DeserializingStream& s, const std::string& prefix, ConvexifyData& d) {
+  void Convexify::deserialize(DeserializingStream& s, const std::string& prefix,
+      ConvexifyData& d) {
     s.version(prefix + "Convexify", 1);
     int type_in;
     s.unpack(prefix + "Convexify::type_in", type_in);
@@ -154,9 +155,11 @@ namespace casadi {
 
   void Convexify::generate(CodeGenerator& g,
                        const std::vector<casadi_int>& arg,
-                       const std::vector<casadi_int>& res) const {
+                       const std::vector<casadi_int>& res,
+                       const std::vector<bool>& arg_is_ref,
+                       std::vector<bool>& res_is_ref) const {
     std::string ret = g.convexify_eval(convexify_data_,
-      g.work(arg[0], dep(0).nnz()), g.work(res[0], nnz()), "iw", "w");
+      g.work(arg[0], dep(0).nnz(), arg_is_ref[0]), g.work(res[0], nnz(), false), "iw", "w");
     g << "if (" << ret << ") return 1;\n";
   }
 
@@ -270,10 +273,10 @@ namespace casadi {
 
     d.sz_w = 0;
     if (d.config.strategy==CVX_EIGEN_REFLECT || d.config.strategy==CVX_EIGEN_CLIP) {
-      d.sz_w = max(block_size, 2*(block_size-1)*d.config.max_iter_eig);
-      if (d.config.Hsp_project) d.sz_w = max(d.sz_w, Hsp.size1());
+      d.sz_w = std::max(block_size, 2*(block_size-1)*d.config.max_iter_eig);
+      if (d.config.Hsp_project) d.sz_w = std::max(d.sz_w, Hsp.size1());
       if (d.config.scc_transform) d.sz_w += block_size*block_size;
-      if (inplace) d.sz_w = max(d.sz_w, Hsp.size1()+d.Hrsp.nnz());
+      if (inplace) d.sz_w = std::max(d.sz_w, Hsp.size1()+d.Hrsp.nnz());
     }
     d.sz_w = Hsp.size1()+d.sz_w;
 

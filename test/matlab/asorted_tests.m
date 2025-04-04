@@ -1,5 +1,45 @@
 import casadi.*
 
+
+x = MX.sym('x',2,3);
+p = MX.sym('p');
+
+X = DM.rand(2,3);
+% brace
+for p0=1:6 
+    f = Function('f',{x,p},{x{p}});
+    f_ref = Function('f',{x},{x{p0}});
+    r = f(X,p0);
+    r_ref = f_ref(X);
+    assert(all(full(r==r_ref)));
+end
+% brace_asgn
+for p0=1:6
+    x = MX.sym('x',2,3);
+    p = MX.sym('p');
+
+    x1 = MX(x);
+    x2 = MX(x);
+    x1{p} = 3.7;
+    x2{p0} = 3.7;
+    
+    f = Function('f',{x,p},{x1});
+    f_ref = Function('f',{x},{x2});
+    r = f(X,p0);
+    r_ref = f_ref(X);
+    assert(all(all(full(r==r_ref))));
+end
+
+test_cases = {4 [1 2] [1;2] [1 2; 3 4] [1 2 3; 3 4 5] [1 2; 4 5; 7 8]};
+
+for i=numel(test_cases)
+    e=test_cases{i};
+    assert(all(sum(e)==full(sum(DM(e)))));
+    assert(all(sum(e,1)==full(sum(DM(e),1))));
+    assert(all(sum(e,2)==full(sum(DM(e),2))));
+    assert(all(sum(e,'all')==full(sum(DM(e),'all'))));
+end
+
 MX(2,1)
 
 % SX stuff
@@ -110,7 +150,7 @@ ode = struct('x', x, 'ode', x)
 opts = struct
 opts.verbose = true
 
-intg = casadi.integrator('integrator', 'rk', ode, opts);
+intg = casadi.integrator('integrator', 'rk', ode, 0, 1, opts);
 intg.call(struct);
 diary off
 
@@ -397,6 +437,14 @@ if ~is_octave
   assert(data.x.isnull)
 end
 
+if ismac
+  compile_flags = 'CFLAGS=$CFLAGS -pedantic -std=c99 -fPIC -Wall -Werror -Wextra -Wno-unknown-pragmas -Wno-long-long -Wno-unused-parameter'
+elseif isunix
+  compile_flags = 'CFLAGS=$CFLAGS -pedantic -std=c89 -fPIC -Wall -Werror -Wextra -Wno-unknown-pragmas -Wno-long-long -Wno-unused-parameter'
+else
+  compile_flags = '';
+end
+
 x=SX.sym('x');
 f=Function('f',{x},{2*x,DM.eye(2)*x});
 f.generate('fmex',struct('mex',true));
@@ -404,7 +452,7 @@ clear fmex
 if is_octave
 mex -DMATLAB_MEX_FILE fmex.c
 else
-mex -largeArrayDims fmex.c
+mex('-largeArrayDims',compile_flags,'fmex.c')
 end
 [a,b] = fmex('f',3);
 assert(norm(a-6,1)==0);
@@ -415,7 +463,7 @@ clear fmex
 if is_octave
 mex -DCASADI_MEX_NO_SPARSE -DMATLAB_MEX_FILE fmex.c
 else
-mex -DCASADI_MEX_NO_SPARSE -largeArrayDims fmex.c
+mex('-DCASADI_MEX_NO_SPARSE',compile_flags,'-largeArrayDims','fmex.c')
 end
 [a,b] = fmex('f',3);
 assert(norm(a-6,1)==0);
@@ -440,13 +488,158 @@ clear fmex_rp
 if is_octave
 mex -DCASADI_MEX_NO_SPARSE -DMATLAB_MEX_FILE fmex_rp.c
 else
-mex -DCASADI_MEX_NO_SPARSE -largeArrayDims fmex_rp.c
+mex('-DCASADI_MEX_NO_SPARSE',compile_flags,'-largeArrayDims','fmex_rp.c')
 end
 [a,b] = fmex_rp('f',3);
 assert(norm(a-6,1)==0);
 assert(norm(b-3*eye(2),1)==0);
 assert(~issparse(a));
 assert(~issparse(b));
+
+
+x=SX.sym('x');
+f=Function('f',{x},{2*x,DM.eye(2)*x});
+f.generate('fmex',struct('mex',true));
+clear fmex
+if is_octave
+mex -DMATLAB_MEX_FILE fmex.c
+else
+mex('-largeArrayDims',compile_flags,'fmex.c')
+end
+[a,b] = fmex(3);
+assert(norm(a-6,1)==0);
+assert(norm(b-3*eye(2),1)==0);
+
+x=SX.sym('x');
+f=Function('f',{x},{2*x,DM.eye(2)*x});
+g=Function('g',{x},{3*x,DM.eye(2)*x});
+cg = CodeGenerator('fmex', struct('mex',true))
+cg.add(f)
+cg.add(g)
+cg.generate()
+
+clear fmex
+if is_octave
+mex -DMATLAB_MEX_FILE fmex.c
+else
+mex('-largeArrayDims',compile_flags,'fmex.c')
+end
+
+flag = false;
+try
+  [a,b] = fmex(3);
+catch
+  flag = true;
+end
+assert(flag);
+
+[a,b] = fmex('f',3);
+assert(norm(a-6,1)==0);
+assert(norm(b-3*eye(2),1)==0);
+
+
+flag = false;
+try
+  [a,b] = fmex('h',3);
+catch
+  flag = true;
+end
+assert(flag);
+
+flag = false;
+try
+  [a,b] = fmex('hhhhhh',3);
+catch
+  flag = true;
+end
+assert(flag);
+
+x = SX.sym('x',2,2);
+y = SX.sym('y',Sparsity.lower(2))
+f=Function('f',{x,y},{x+y,3*y});
+f.generate('fmex',struct('mex',true));
+clear fmex
+if is_octave
+mex -DMATLAB_MEX_FILE fmex.c
+else
+mex('-largeArrayDims',compile_flags,'fmex.c')
+end
+xnom = [1 2;3 5]
+ynom = sparse([7 0;6 9])
+[a,b] = fmex('f',xnom,ynom);
+assert(norm(a-(xnom+ynom),1)==0);
+assert(norm(b-3*ynom,1)==0);
+assert(~issparse(a));
+assert(issparse(b));
+xnom = [4 4;4 4]
+ynom = sparse([5 0;5 5])
+[a,b] = fmex('f',4,5);
+assert(norm(a-(xnom+ynom),1)==0);
+assert(norm(b-3*ynom,1)==0);
+assert(~issparse(a));
+assert(issparse(b));
+
+ynom = sparse([5 0;0 6])
+[a,b] = fmex('f',4,ynom);
+assert(norm(a-(xnom+ynom),1)==0);
+assert(norm(b-3*ynom,1)==0);
+assert(~issparse(a));
+assert(issparse(b));
+
+ynom = sparse([5 0;6 7])
+[a,b] = fmex('f',4,sparse([5 12;6 7]));
+assert(norm(a-(xnom+ynom),1)==0);
+assert(norm(b-3*ynom,1)==0);
+assert(~issparse(a));
+assert(issparse(b));
+
+ynom = sparse([5 0;6 7])
+[a,b] = fmex('f',4,[5 12;6 7]);
+assert(norm(a-(xnom+ynom),1)==0);
+assert(norm(b-3*ynom,1)==0);
+assert(~issparse(a));
+assert(issparse(b));
+
+xnom = [4 4;4 4]
+ynom = sparse([5 0;5 5])
+
+flag = false;
+try
+  [a,b] = fmex('f',[2 3],ynom);
+catch
+  flag = true;
+end
+assert(flag);
+
+flag = false;
+try
+  [a,b] = fmex('f',xnom,sparse(ones(3,2)));
+catch
+  flag = true;
+end
+assert(flag);
+
+clear fmex
+if is_octave
+mex -DCASADI_MEX_NO_SPARSE -DMATLAB_MEX_FILE fmex.c
+else
+mex('-DCASADI_MEX_NO_SPARSE',compile_flags,'-largeArrayDims','fmex.c')
+end
+xnom = [1 2;3 5]
+ynom = sparse([7 0;6 9])
+[a,b] = fmex('f',xnom,ynom);
+assert(norm(a-(xnom+ynom),1)==0);
+assert(norm(b-3*ynom,1)==0);
+assert(~issparse(a));
+assert(~issparse(b));
+xnom = [4 4;4 4]
+ynom = sparse([5 0;5 5])
+[a,b] = fmex('f',4,5);
+assert(norm(a-(xnom+ynom),1)==0);
+assert(norm(b-3*ynom,1)==0);
+assert(~issparse(a));
+assert(~issparse(b));
+
 
 Xs = {SX, MX};
 for j=1:2;
@@ -605,7 +798,7 @@ A = MX.sym('A',3,2);
 x = MX.sym('x');
 xi = 1;
 
-%f = Function('f',{A,x},{A{x}});assert(f(A0,xi)==A0{xi})
+f = Function('f',{A,x},{A{x}});assert(full(f(A0,xi)-A0{xi})==0)
 f = Function('f',{A,x},{A(x,:)});assert(full(norm(f(A0,xi)-A0(xi,:)))==0)
 f = Function('f',{A,x},{A(:,x)});assert(full(norm(f(A0,xi)-A0(:,xi)))==0)
 f = Function('f',{A,x},{A(1:2,x)});assert(full(norm(f(A0,xi)-A0(1:2,xi)))==0)
@@ -621,4 +814,33 @@ A0 = DM([1 2 3])';
 A = MX.sym('A',1,3);
 f = Function('f',{A,x},{A(x)});assert(full(norm(f(A0,xi)-A0(xi)))==0)
 
+
+for a=[5,-5]
+    for b=[3,-3]
+        assert(rem(a,b)==full(rem(DM(a),DM(b))))
+    end
+end
+
+flag = false;
+try
+  mod(DM(5),DM(3))
+catch
+  flag = true;
+end
+
+assert(flag);
+
+x = MX.sym('x');
+f = Function('f',{x},{x.attachAssert(0, 'Hey %d \Warning foo')});
+
+msg = '';
+try
+  f()
+catch err
+  msg = err.message;
+end
+assert(~isempty(strfind(msg,'Hey %d \Warning foo')))
+
+
+disp('success')
 

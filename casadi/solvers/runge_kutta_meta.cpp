@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -28,22 +28,14 @@
 
       const std::string casadi::RungeKutta::meta_doc=
       "\n"
-"Fixed-step explicit Runge-Kutta integrator for ODEs Currently\n"
+"\n"
+"\n"
+"Fixed-step explicit Runge-Kutta integrator for ODEs Currently \n"
 "implements RK4.\n"
 "\n"
 "The method is still under development\n"
 "\n"
-"\n"
-">List of available options\n"
-"\n"
-"+-----------------+-----------------+-----------------+-----------------+\n"
-"|       Id        |      Type       |     Default     |   Description   |\n"
-"+=================+=================+=================+=================+\n"
-"| number_of_finit | OT_INT      | 20              | Number of       |\n"
-"| e_elements      |                 |                 | finite elements |\n"
-"+-----------------+-----------------+-----------------+-----------------+\n"
-"\n"
-"\n"
+"Extra doc: https://github.com/casadi/casadi/wiki/L_23a \n"
 "\n"
 "\n"
 ;

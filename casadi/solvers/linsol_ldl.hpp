@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -26,9 +26,12 @@
 #ifndef CASADI_LINSOL_LDL_HPP
 #define CASADI_LINSOL_LDL_HPP
 
-/** \defgroup plugin_Linsol_ldl
+/** \defgroup plugin_Linsol_ldl Title
+    \par
+
   * Linear solver using sparse direct LDL factorization
-*/
+
+    \identifier{233} */
 
 /** \pluginsection{Linsol,ldl} */
 
@@ -41,9 +44,9 @@ namespace casadi {
     std::vector<double> l, d, w;
   };
 
-  /** \brief \pluginbrief{LinsolInternal,ldl}
+  /** \brief \pluginbrief{Linsol,ldl}
    * @copydoc LinsolInternal_doc
-   * @copydoc plugin_LinsolInternal_ldl
+   * @copydoc plugin_Linsol_ldl
    */
   class CASADI_LINSOL_LDL_EXPORT LinsolLdl : public LinsolInternal {
   public:

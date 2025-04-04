@@ -2,8 +2,8 @@
 #     This file is part of CasADi.
 #
 #     CasADi -- A symbolic framework for dynamic optimization.
-#     Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
-#                             K.U. Leuven. All rights reserved.
+#     Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+#                             KU Leuven. All rights reserved.
 #     Copyright (C) 2011-2014 Greg Horn
 #
 #     CasADi is free software; you can redistribute it and/or
@@ -76,6 +76,12 @@ except:
   pass
 
 try:
+  load_linsol("mumps")
+  lsolvers.append(("mumps",{},{"symmetry"}))
+except:
+  pass
+
+try:
   load_linsol("qr")
   lsolvers.append(("qr",{},set()))
 except:
@@ -86,6 +92,7 @@ try:
   lsolvers.append(("ldl",{},{"posdef","symmetry"}))
 except:
   pass
+
 
 nsolvers = []
 
@@ -124,13 +131,13 @@ class LinearSolverTests(casadiTestCase):
         options["ad_weight_sp"] = 0
         solver = Solver("solver", A.T.sparsity(), options)
 
-        Jf = solver.jacobian_old(0, 0)
+        Jf = jacobian_old(solver, 0, 0)
 
         options["ad_weight"] = 1
         options["ad_weight_sp"] = 1
         solver = Solver("solver", A.T.sparsity(), options)
 
-        Jb = solver.jacobian_old(0, 0)
+        Jb = jacobian_old(solver, 0, 0)
 
         Jf_in = [0]*Jf.n_in();Jf_in[0]=A.T
         Jb_in = [0]*Jb.n_in();Jb_in[0]=A.T
@@ -280,9 +287,12 @@ class LinearSolverTests(casadiTestCase):
       else:
         A0 = A
       solver = casadi.Linsol("solver", Solver, A0.sparsity(), options)
+      with self.assertInException("No stats available since Linsol did not solve a problem yet."):
+          solver.stats()
       b = DM([1,0.5])
       x = solver.solve(A0.T, b)
       res = np.linalg.solve(A0.T,b)
+      print(solver.stats())
       self.checkarray(x, res)
 
   def test_simple(self):
@@ -509,6 +519,7 @@ class LinearSolverTests(casadiTestCase):
 
 
     for Solver, options, req in lsolvers:
+      if "mumps" in str(Solver): continue
       print(Solver)
       f = Function('f', [x, y], [x ** 2 - y])
       finv = rootfinder('finv', "newton", f, {"linear_solver": Solver, "linear_solver_options": options})
@@ -523,6 +534,139 @@ class LinearSolverTests(casadiTestCase):
       res = f_par(numpy.linspace(10, 0, 200), numpy.linspace(0, 10, 200))
 
 
+  def test_issue2664(self):
+
+    bnum = DM.rand(3,3)
+
+    x = MX.sym('x',3,3)
+    for b in [MX.sym('b',3,3),MX.sym('b',Sparsity.lower(3)),MX.sym('b',Sparsity.upper(3))]:
+      f = Function('f',[x,b],[solve(x,b,'symbolicqr')])
+
+      for bn in [bnum,bnum[Sparsity.lower(3)],bnum[Sparsity.upper(3)]]:
+
+        A = evalf(f(diagcat(1,2,3),SX(bn)))
+        B = f(diagcat(1,2,3),bn)
+        self.checkarray(A,B)
+
+  @memory_heavy()
+  def test_issue3489(self):
+
+    import casadi as ca
+
+    E_f = ca.SX.sym("E_f")
+    E_r = ca.SX.sym("E_r")
+    T = ca.SX.sym("T")
+    k_f = ca.SX.sym("k_f")
+    k_r = ca.SX.sym("k_r")
+
+    k0_f = ca.SX.sym("k0_f")
+    k0_r = ca.SX.sym("k0_r")
+    x_1 = ca.SX.sym("x_1")
+    x_2 = ca.SX.sym("x_2")
+    x_3 = ca.SX.sym("x_3")
+    x_4 = ca.SX.sym("x_4")
+    r_1 = ca.SX.sym("r_1")
+    r_2 = ca.SX.sym("r_2")
+    r_3 = ca.SX.sym("r_3")
+    r_4 = ca.SX.sym("r_4")
+
+    y_1 = ca.SX.sym("y_1")
+    y_2 = ca.SX.sym("y_2")
+    y_3 = ca.SX.sym("y_3")
+    y_4 = ca.SX.sym("y_4")
+
+
+    eq1 = k_f - k0_f -E_f + T
+    eq2 = k_r - k0_r -E_r + T
+    eq3 = r_1 - k_f + (-x_1) + (-x_2) - k_r + (x_3) + (x_4)
+    eq4 = r_2 - k_f + (-x_1) + (-x_2) - k_r + (x_3) + (x_4)
+    eq5 = r_3 - k_f + (-x_1) + (-x_2) - k_r + (x_3) + (x_4)
+    eq6 = r_4 - k_f + (-x_1) + (-x_2) - k_r + (x_3) + (x_4)
+    eq7 = 1 * 0.2 - 1 * x_1 + r_1
+    eq8 = 1 * 0.8 - 1 * x_2 + r_2
+    eq9 = -1 * x_3 + r_3
+    eq10 = -1 * x_4 + r_4
+
+    eq11 = x_1 - y_1
+    eq12 = x_2 - y_2
+    eq13 = x_3 - y_3
+    eq14 = x_4 - y_4
+
+    all_vars = [k_f, k_r, x_1, x_2, x_3, x_4, r_1, r_2, r_3, r_4]
+    all_vars.extend([y_1, y_2, y_3, y_4])
+
+
+    all_eq = []
+
+    all_eq.extend([eq11, eq12, eq13, eq14])
+    all_eq.extend([eq3, eq4, eq5, eq6, eq7, eq8, eq9, eq10])
+    all_eq.extend([eq1, eq2,])
+
+    x = ca.vcat(all_vars)
+    p = ca.vcat([E_f, E_r, k0_f, k0_r, T])
+    g = ca.vcat(all_eq)
+
+    A = evalf(jacobian(g,x))
+    B = evalf(jacobian(g,p))
+
+    Amx = MX.sym("A",A.sparsity())
+    Bmx = MX.sym("B",B.sparsity())
+
+    rf = {"x": x, "p": p, "g": g}
+
+    sim = ca.rootfinder("s", "fast_newton", rf, {"ad_weight_sp":0})
+    S1 = sim.jac_sparsity(0,1)
+    sim = ca.rootfinder("s", "fast_newton", rf, {"ad_weight_sp":1})
+    S2 = sim.jac_sparsity(0,1)
+    
+    self.assertTrue(S1==S2)
+    
+    np.random.seed(1)
+    m = 14
+    p = 13
+    for i in range(25):
+        while True:
+            A = self.randDM(m,m,sparsity=0.15)
+            if sprank(A)==m:
+              break
+        B = self.randDM(m,p,sparsity=0.1)
+        C = sparsify(solve(A,B),1e-7).sparsity()
+    
+        P = MX.sym("p", p)
+
+        f0 = Function("f",[P],[solve(A, mtimes(B,P))], {"ad_weight_sp": 0})
+        S1=f0.jac_sparsity(0,0)
+ 
+        f1 = Function("f",[P],[solve(A, mtimes(B,P))], {"ad_weight_sp": 1})
+        S2=f1.jac_sparsity(0,0)
+      
+        self.assertTrue(S1==S2)
+        self.assertTrue(C.is_subset(S1))
+    
+    
+  def test_issue2734(self):
+    example_input = blockcat([[     8  ,  1  ,   6],[
+         3 ,    5  ,   7],[
+         4  ,   9   ,  2]])
+
+    ## SX
+    a=SX.sym('a',3,3)
+    f=Function('f',[a],[pinv(a)])
+    res1 = f(example_input)
+
+    ## MX without expand
+    am=MX.sym('am',3,3)
+    fm=Function('f',[am],[pinv(am,'symbolicqr')])
+    res2 = fm(example_input)
+
+    ## MX with expand (gives incorrect result)
+    am=MX.sym('am',3,3)
+    fm=Function('f',[am],[pinv(am,'symbolicqr')])
+    fm=fm.expand(); 
+    res3 = fm(example_input)
+    
+    self.checkarray(res1,res2)
+    self.checkarray(res1,res3)
 
 
 if __name__ == '__main__':

@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -24,8 +24,6 @@
 
 
 #include "subref.hpp"
-
-using namespace std;
 
 namespace casadi {
 
@@ -58,7 +56,7 @@ namespace casadi {
   }
 
   std::string SubRef::disp(const std::vector<std::string>& arg) const {
-    stringstream ss;
+    std::stringstream ss;
     ss << arg.at(0) << "[" << i_ << ", " << j_ << "]";
     return ss.str();
   }
@@ -79,7 +77,9 @@ namespace casadi {
 
   void SubRef::generate(CodeGenerator& g,
                         const std::vector<casadi_int>& arg,
-                        const std::vector<casadi_int>& res) const {
+                        const std::vector<casadi_int>& res,
+                        const std::vector<bool>& arg_is_ref,
+                        std::vector<bool>& res_is_ref) const {
     casadi_error("not ready");
   }
 

@@ -6,8 +6,16 @@ if(WITH_SUNDIALS)
   add_subdirectory(sundials)
 endif()
 
+if(WITH_SLEQP)
+  add_subdirectory(sleqp)
+endif()
+
 if(WITH_IPOPT)
   add_subdirectory(ipopt)
+endif()
+
+if(WITH_MADNLP)
+  add_subdirectory(madnlp)
 endif()
 
 if(WITH_BONMIN)
@@ -40,6 +48,18 @@ endif()
 
 if(WITH_CLANG)
   add_subdirectory(clang)
+endif()
+
+if(WITH_HIGHS)
+  add_subdirectory(highs)
+endif()
+
+if(WITH_CLARABEL)
+  add_subdirectory(clarabel)
+endif()
+
+if(WITH_DAQP)
+  add_subdirectory(daqp)
 endif()
 
 if(WITH_HSL)
@@ -82,6 +102,14 @@ if(WITH_HPMPC)
   add_subdirectory(hpmpc)
 endif()
 
+if(WITH_HPIPM)
+  add_subdirectory(hpipm)
+endif()
+
+if(WITH_FATROP)
+  add_subdirectory(fatrop)
+endif()
+
 if(WITH_SUPERSCS)
   add_subdirectory(superscs)
 endif()
@@ -94,8 +122,28 @@ if(WITH_AMPL)
   add_subdirectory(ampl)
 endif()
 
+if(WITH_PROXQP)
+  add_subdirectory(proxqp)
+endif()
+
 if(WITH_OSQP)
   add_subdirectory(osqp)
+endif()
+
+if(WITH_ALPAQA)
+  add_subdirectory(alpaqa)
+endif()
+
+if(WITH_MATLAB_IPC)
+  add_subdirectory(matlab_ipc)
+endif()
+
+if(WITH_LIBZIP)
+  add_subdirectory(libzip)
+endif()
+
+if(WITH_GHC_FILESYSTEM)
+  add_subdirectory(ghc)
 endif()
 
 if(WITH_LINT)

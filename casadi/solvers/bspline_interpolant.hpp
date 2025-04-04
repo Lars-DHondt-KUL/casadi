@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -29,8 +29,10 @@
 #include "casadi/core/interpolant_impl.hpp"
 #include <casadi/solvers/casadi_interpolant_bspline_export.h>
 
-/** \defgroup plugin_Interpolant_bspline
-*/
+/** \defgroup plugin_Interpolant_bspline Title
+    \par
+
+    \identifier{239} */
 
 /** \pluginsection{Interpolant,bspline} */
 
@@ -78,7 +80,7 @@ namespace casadi {
     }
 
     // Is differentiable? Deferred to bspline
-    bool is_diff_in(casadi_int i) override { return true; }
+    bool get_diff_in(casadi_int i) override { return true; }
 
     // Initialize
     void init(const Dict& opts) override;
@@ -93,6 +95,33 @@ namespace casadi {
                                       const std::vector<std::string>& inames,
                                       const std::vector<std::string>& onames,
                                       const Dict& opts) const override;
+    ///@}
+
+
+    ///@{
+    /** \brief Return function that calculates forward derivatives
+     *    forward(nfwd) returns a cached instance if available,
+     *    and calls <tt>Function get_forward(casadi_int nfwd)</tt>
+     *    if no cached version is available.
+     */
+    bool has_forward(casadi_int nfwd) const override { return true; }
+    Function get_forward(casadi_int nfwd, const std::string& name,
+                                 const std::vector<std::string>& inames,
+                                 const std::vector<std::string>& onames,
+                                 const Dict& opts) const override;
+    ///@}
+
+    ///@{
+    /** \brief Return function that calculates adjoint derivatives
+     *    reverse(nadj) returns a cached instance if available,
+     *    and calls <tt>Function get_reverse(casadi_int nadj)</tt>
+     *    if no cached version is available.
+     */
+    bool has_reverse(casadi_int nadj) const override { return true; }
+    Function get_reverse(casadi_int nadj, const std::string& name,
+                                 const std::vector<std::string>& inames,
+                                 const std::vector<std::string>& onames,
+                                 const Dict& opts) const override;
     ///@}
 
     /** \brief Is codegen supported? */
@@ -115,6 +144,9 @@ namespace casadi {
 
     // Spline Function
     Function S_;
+
+    // Get all embedded functions, recursively
+    void find(std::map<FunctionInternal*, Function>& all_fun, casadi_int max_depth) const override;
 
     /** \brief  Propagate sparsity forward */
     int sp_forward(const bvec_t** arg, bvec_t** res,
@@ -268,6 +300,7 @@ namespace casadi {
       default:
         casadi_assert_dev(false);
       }
+      return MX();  // Cannot happen
     }
 
 } // namespace casadi

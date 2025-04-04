@@ -1,59 +1,51 @@
 /*
- *    This file is part of CasADi.
+ *    MIT No Attribution
  *
- *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
- *    Copyright (C) 2011-2014 Greg Horn
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl, KU Leuven.
  *
- *    CasADi is free software; you can redistribute it and/or
- *    modify it under the terms of the GNU Lesser General Public
- *    License as published by the Free Software Foundation; either
- *    version 3 of the License, or (at your option) any later version.
+ *    Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ *    software and associated documentation files (the "Software"), to deal in the Software
+ *    without restriction, including without limitation the rights to use, copy, modify,
+ *    merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ *    permit persons to whom the Software is furnished to do so.
  *
- *    CasADi is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *    Lesser General Public License for more details.
- *
- *    You should have received a copy of the GNU Lesser General Public
- *    License along with CasADi; if not, write to the Free Software
- *    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ *    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ *    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ *    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ *    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  */
 
 
 #include <casadi/casadi.hpp>
 
-using namespace std;
 using namespace casadi;
 
-int main(){
+int main() {
 
   // Example on how to use the DaeBuilder class
-  // Joel Andersson, UW Madison 2017
+  // Joel Andersson, 2017-2025
 
   // Start with an empty DaeBuilder instance
-  DaeBuilder dae;
+  DaeBuilder dae("rocket");
 
-  // Add input expressions
-  auto a = dae.add_p("a");
-  auto b = dae.add_p("b");
-  auto u = dae.add_u("u");
-  auto h = dae.add_x("h");
-  auto v = dae.add_x("v");
-  auto m = dae.add_x("m");
+  // Model variables
+  auto a = dae.add("a", "parameter", "tunable");
+  auto b = dae.add("b", "parameter", "tunable");
+  auto u = dae.add("u", "input");
+  auto h = dae.add("h");
+  auto v = dae.add("v");
+  auto m = dae.add("m");
 
   // Constants
   double g = 9.81; // gravity
 
-  // Add output expressions
-  auto hdot = v;
-  auto vdot = (u-a*pow(v,2))/m-g;
-  auto mdot = -b*pow(u,2);
-  dae.add_ode("hdot", hdot);
-  dae.add_ode("vdot", vdot);
-  dae.add_ode("mdot", mdot);
+  // Dynamic equations
+  dae.eq(dae.der(h), v);
+  dae.eq(dae.der(v), (u-a*pow(v,2))/m-g);
+  dae.eq(dae.der(m), -b*pow(u,2));
 
   // Specify initial conditions
   dae.set_start("h", 0);
@@ -66,7 +58,10 @@ int main(){
   dae.set_unit("m","kg");
 
   // Print DAE
-  dae.disp(cout, true);
+  dae.disp(std::cout, true);
 
+  // Generate FMU
+  std::vector<std::string> files = dae.export_fmu();
+  std::cout << "generated files: " << files << "\n";
   return 0;
 }

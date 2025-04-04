@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -27,5 +27,33 @@
       #include <string>
 
       const std::string casadi::OsqpInterface::meta_doc=
+      "\n"
+"\n"
+"\n"
+"Interface to the OSQP Solver for quadratic programming\n"
+"\n"
+"Extra doc: https://github.com/casadi/casadi/wiki/L_220 \n"
+"\n"
+"\n"
+"Interface to the PROXQP Solver for quadratic programming\n"
+"\n"
+"Extra doc: https://github.com/casadi/casadi/wiki/L_243 \n"
+"\n"
+"\n"
+">List of available options\n"
+"\n"
+"+-------------------+---------+--------------------------------------------+\n"
+"|        Id         |  Type   |                Description                 |\n"
+"+===================+=========+============================================+\n"
+"| osqp              | OT_DICT | const Options to be passed to osqp.        |\n"
+"+-------------------+---------+--------------------------------------------+\n"
+"| warm_start_dual   | OT_BOOL | Use lam_a0 and lam_x0 input to warmstart   |\n"
+"|                   |         | [Default: truw].                           |\n"
+"+-------------------+---------+--------------------------------------------+\n"
+"| warm_start_primal | OT_BOOL | Use x0 input to warmstart [Default: true]. |\n"
+"+-------------------+---------+--------------------------------------------+\n"
+"\n"
+"\n"
+"\n"
 "\n"
 ;

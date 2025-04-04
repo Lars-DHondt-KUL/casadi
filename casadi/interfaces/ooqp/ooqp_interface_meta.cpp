@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -28,34 +28,30 @@
 
       const std::string casadi::OoqpInterface::meta_doc=
       "\n"
-"Interface to the OOQP Solver for quadratic programming The current\n"
-"implementation assumes that OOQP is configured with the MA27 sparse\n"
+"\n"
+"\n"
+"Interface to the OOQP Solver for quadratic programming The current \n"
+"implementation assumes that OOQP is configured with the MA27 sparse \n"
 "linear solver.\n"
 "\n"
-"NOTE: when doing multiple calls to evaluate(), check if you need to\n"
+"NOTE: when doing multiple calls to evaluate(), check if you need to \n"
 "reInit();\n"
+"\n"
+"Extra doc: https://github.com/casadi/casadi/wiki/L_222 \n"
 "\n"
 "\n"
 ">List of available options\n"
 "\n"
-"+-----------------+-----------------+-----------------+-----------------+\n"
-"|       Id        |      Type       |     Default     |   Description   |\n"
-"+=================+=================+=================+=================+\n"
-"| artol           | OT_DOUBLE         | 0.000           | tolerance as    |\n"
-"|                 |                 |                 | provided with   |\n"
-"|                 |                 |                 | setArTol to     |\n"
-"|                 |                 |                 | OOQP            |\n"
-"+-----------------+-----------------+-----------------+-----------------+\n"
-"| mutol           | OT_DOUBLE         | 0.000           | tolerance as    |\n"
-"|                 |                 |                 | provided with   |\n"
-"|                 |                 |                 | setMuTol to     |\n"
-"|                 |                 |                 | OOQP            |\n"
-"+-----------------+-----------------+-----------------+-----------------+\n"
-"| print_level     | OT_INT      | 0               | Print level.    |\n"
-"|                 |                 |                 | OOQP listens to |\n"
-"|                 |                 |                 | print_level 0,  |\n"
-"|                 |                 |                 | 10 and 100      |\n"
-"+-----------------+-----------------+-----------------+-----------------+\n"
+"+-------------+-----------+------------------------------------------------+\n"
+"|     Id      |   Type    |                  Description                   |\n"
+"+=============+===========+================================================+\n"
+"| artol       | OT_DOUBLE | tolerance as provided with setArTol to OOQP    |\n"
+"+-------------+-----------+------------------------------------------------+\n"
+"| mutol       | OT_DOUBLE | tolerance as provided with setMuTol to OOQP    |\n"
+"+-------------+-----------+------------------------------------------------+\n"
+"| print_level | OT_INT    | Print level. OOQP listens to print_level 0, 10 |\n"
+"|             |           | and 100                                        |\n"
+"+-------------+-----------+------------------------------------------------+\n"
 "\n"
 "\n"
 "\n"

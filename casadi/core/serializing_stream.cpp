@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -28,15 +28,17 @@
 #include "slice.hpp"
 #include "linsol.hpp"
 #include "importer.hpp"
+#include "resource_internal.hpp"
+#include "fmu.hpp"
 #include "generic_type.hpp"
-#include "shared_object_internal.hpp"
+#include "shared_object.hpp"
 #include "sx_node.hpp"
 #include "sparsity_internal.hpp"
 #include "mx_node.hpp"
 #include "function_internal.hpp"
+#include "fmu_impl.hpp" // Not sure why this is needed and importer_internal.hpp is not
 #include <iomanip>
 
-using namespace std;
 namespace casadi {
 
     static casadi_int serialization_protocol_version = 3;
@@ -47,6 +49,13 @@ namespace casadi {
       casadi_assert(in_s.good(), "Invalid input stream. If you specified an input file, "
         "make sure it exists relative to the current directory.");
 
+      if (in_s.peek() != std::char_traits<char>::eof()) {
+        setup();
+      }
+    }
+
+    void DeserializingStream::setup() {
+      if (set_up_) return;
       // Sanity check
       casadi_int check;
       unpack(check);
@@ -65,7 +74,7 @@ namespace casadi {
       bool debug;
       unpack(debug);
       debug_ = debug;
-
+      set_up_ = true;
     }
 
     SerializingStream::SerializingStream(std::ostream& out_s) :
@@ -154,6 +163,24 @@ namespace casadi {
       for (int j=0;j<4;++j) pack(c[j]);
     }
 
+#if SIZE_MAX != UINT_MAX || defined(__EMSCRIPTEN__)
+    void DeserializingStream::unpack(unsigned int& e) {
+      assert_decoration('u');
+      uint32_t n;
+      char* c = reinterpret_cast<char*>(&n);
+
+      for (int j=0;j<4;++j) unpack(c[j]);
+      e = n;
+    }
+
+    void SerializingStream::pack(unsigned int e) {
+      decorate('u');
+      uint32_t n = e;
+      const char* c = reinterpret_cast<const char*>(&n);
+      for (int j=0;j<4;++j) pack(c[j]);
+    }
+#endif
+
     void DeserializingStream::unpack(bool& e) {
       assert_decoration('b');
       char n;
@@ -185,10 +212,10 @@ namespace casadi {
 
     void SerializingStream::pack(const std::string& e) {
       decorate('s');
-      int s = e.size();
+      int s = static_cast<int>(e.size());
       pack(s);
       const char* c = e.c_str();
-      for (int j=0;j<s;++j) pack(c[j]);
+      for (int j = 0; j < s; ++j) pack(c[j]);
     }
 
     void DeserializingStream::unpack(std::string& e) {
@@ -249,6 +276,26 @@ namespace casadi {
     void DeserializingStream::unpack(Importer& e) {
       assert_decoration('M');
       shared_unpack<Importer, ImporterInternal>(e);
+    }
+
+    void SerializingStream::pack(const Resource& e) {
+      decorate('R');
+      shared_pack(e);
+    }
+
+    void DeserializingStream::unpack(Resource& e) {
+      assert_decoration('R');
+      shared_unpack<Resource, ResourceInternal>(e);
+    }
+
+    void SerializingStream::pack(const Fmu& e) {
+      decorate('F');
+      shared_pack(e);
+    }
+
+    void DeserializingStream::unpack(Fmu& e) {
+      assert_decoration('F');
+      shared_unpack<Fmu, FmuInternal>(e);
     }
 
     void SerializingStream::pack(const Linsol& e) {
@@ -391,6 +438,22 @@ namespace casadi {
         delete static_cast<SharedObjectInternal*>(node);
       }
     }
+  }
+
+  void SerializingStream::connect(DeserializingStream & s) {
+    nodes_ = &s.nodes_;
+  }
+
+  void DeserializingStream::connect(SerializingStream & s) {
+    shared_map_ = &s.shared_map_;
+  }
+
+  void SerializingStream::reset() {
+    shared_map_.clear();
+  }
+
+  void DeserializingStream::reset() {
+    nodes_.clear();
   }
 
 } // namespace casadi

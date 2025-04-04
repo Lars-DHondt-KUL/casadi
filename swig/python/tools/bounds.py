@@ -2,8 +2,8 @@
 #     This file is part of CasADi.
 #
 #     CasADi -- A symbolic framework for dynamic optimization.
-#     Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
-#                             K.U. Leuven. All rights reserved.
+#     Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+#                             KU Leuven. All rights reserved.
 #     Copyright (C) 2011-2014 Greg Horn
 #
 #     CasADi is free software; you can redistribute it and/or
@@ -22,7 +22,7 @@
 #
 #
 from casadi import *
-from numpy import Inf
+from numpy import inf
 
 def reportBounds(value,lowerbound,upperbound,labels=None,tol=1e-8,showNonViolating=True):
   if hasattr(labels,"labels"):
@@ -75,13 +75,13 @@ def reportBounds(value,lowerbound,upperbound,labels=None,tol=1e-8,showNonViolati
       indicator = ""
     else:
       indicator = "-" * indicator_length
-      if lb[i]==Inf:
+      if lb[i]==inf:
         indicator = "8" +  indicator
       elif (abs(v[i]-lb[i])<=tol):
         indicator = "X" +  indicator
       else:
         indicator = "o" +  indicator
-      if ub[i]==Inf:
+      if ub[i]==inf:
         indicator += "8"
       elif (abs(v[i]-ub[i])<=tol):
         indicator += "X"

@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -41,10 +41,12 @@ namespace casadi {
   class SXElem;
   class GenericType;
   class Importer;
+  class DeserializerBase;
 
 
 
   class CASADI_EXPORT SerializerBase {
+    friend class DeserializerBase;
   public:
 #ifndef SWIG
     SerializerBase(std::unique_ptr<std::ostream> stream, const Dict& opts = Dict());
@@ -75,9 +77,9 @@ namespace casadi {
 
     enum SerializationType {
       SERIALIZED_SPARSITY,
-      SERIALIZED_MX,
+      SERIALIZED_MX_v1,
       SERIALIZED_DM,
-      SERIALIZED_SX,
+      SERIALIZED_SX_v1,
       SERIALIZED_LINSOL,
       SERIALIZED_FUNCTION,
       SERIALIZED_GENERICTYPE,
@@ -85,26 +87,34 @@ namespace casadi {
       SERIALIZED_DOUBLE,
       SERIALIZED_STRING,
       SERIALIZED_SPARSITY_VECTOR,
-      SERIALIZED_MX_VECTOR,
+      SERIALIZED_MX_VECTOR_v1,
       SERIALIZED_DM_VECTOR,
-      SERIALIZED_SX_VECTOR,
+      SERIALIZED_SX_VECTOR_v1,
       SERIALIZED_LINSOL_VECTOR,
       SERIALIZED_FUNCTION_VECTOR,
       SERIALIZED_GENERICTYPE_VECTOR,
       SERIALIZED_INT_VECTOR,
       SERIALIZED_DOUBLE_VECTOR,
       SERIALIZED_STRING_VECTOR,
+      SERIALIZED_MX,
+      SERIALIZED_SX,
+      SERIALIZED_MX_VECTOR,
+      SERIALIZED_SX_VECTOR
     };
 
     static std::string type_to_string(SerializationType type);
 
+    void connect(DeserializerBase & s);
+    void reset();
+
   protected:
     SerializingStream& serializer();
-    std::unique_ptr<std::ostream> stream_;
+    std::unique_ptr<std::ostream> sstream_;
     std::unique_ptr<SerializingStream> serializer_;
   };
 
   class CASADI_EXPORT DeserializerBase {
+    friend class SerializerBase;
   public:
 #ifndef SWIG
     DeserializerBase(std::unique_ptr<std::istream> stream);
@@ -115,8 +125,10 @@ namespace casadi {
 
     Sparsity blind_unpack_sparsity();
     MX blind_unpack_mx();
+    MX blind_unpack_mx_v1();
     Matrix<double> blind_unpack_dm();
     Matrix<SXElem> blind_unpack_sx();
+    Matrix<SXElem> blind_unpack_sx_v1();
     Linsol blind_unpack_linsol();
     Function blind_unpack_function();
     GenericType blind_unpack_generictype();
@@ -125,8 +137,10 @@ namespace casadi {
     std::string blind_unpack_string();
     std::vector<Sparsity> blind_unpack_sparsity_vector();
     std::vector<MX> blind_unpack_mx_vector();
+    std::vector<MX> blind_unpack_mx_vector_v1();
     std::vector< Matrix<double> > blind_unpack_dm_vector();
     std::vector< Matrix<SXElem> > blind_unpack_sx_vector();
+    std::vector< Matrix<SXElem> > blind_unpack_sx_vector_v1();
     std::vector<Linsol> blind_unpack_linsol_vector();
     std::vector<Function> blind_unpack_function_vector();
     std::vector<GenericType> blind_unpack_generictype_vector();
@@ -155,9 +169,12 @@ namespace casadi {
     std::vector<double> unpack_double_vector();
     std::vector<std::string> unpack_string_vector();
 
+    void connect(SerializerBase & s);
+    void reset();
+
   protected:
     DeserializingStream& deserializer();
-    std::unique_ptr<std::istream> stream_;
+    std::unique_ptr<std::istream> dstream_;
     std::unique_ptr<DeserializingStream> deserializer_;
   };
 
@@ -168,18 +185,18 @@ namespace casadi {
      * This class is intended for advanced users that want to circumvent the restrictions
      * of standard pickling/matlab save load, ie no raw SX/MX symbols allowed.
      * 
-     * \example
-     * x = SX.sym('x');
-     * s = StringSerializer();
-     * s.pack(x);
-     * s.pack(sin(x));
-     * 
-     * data = s.encode();
-     * 
-     * s = StringDeserializer(data);
-     * a = s.unpack();
-     * b = s.unpack();
-     * \endexample
+     * \verbatim
+     x = SX.sym('x');
+     s = StringSerializer();
+     s.pack(x);
+     s.pack(sin(x));
+      
+     data = s.encode();
+     
+     s = StringDeserializer(data);
+     a = s.unpack();
+     b = s.unpack();
+     \endverbatim
      * 
      * Note:
      *  Saving SX/MX objects individually has a substantial overhead
@@ -188,16 +205,17 @@ namespace casadi {
      *  the overhead.
      * 
      * 
-     * \seealso Function::save, Function::serialize, StringDeserializer, FileSerializer
-     * 
-     */
+     * \see Function::save, Function::serialize, StringDeserializer, FileSerializer
+     *
+        \identifier{7o} */
     StringSerializer(const Dict& opts = Dict());
     ~StringSerializer();
 
     /** \brief Returns a string that holds the serialized objects
      * 
      * As a side effect, this method clears the internal buffer
-    */
+
+        \identifier{7p} */
     std::string encode();
   };
 
@@ -205,8 +223,9 @@ namespace casadi {
   public:
     /** \brief Advanced serialization of CasADi objects
      * 
-     * \seealso StringSerializer, FileDeserializer
-     */
+     * \see StringSerializer, FileDeserializer
+
+        \identifier{7q} */
     FileSerializer(const std::string& fname, const Dict& opts = Dict());
     ~FileSerializer();
   };
@@ -216,14 +235,16 @@ namespace casadi {
 
     /** \brief Advanced deserialization of CasADi objects
      * 
-     * \seealso StringDeserializer
-     */
-    StringDeserializer(const std::string& string);
+     * \see StringDeserializer
+
+        \identifier{7r} */
+    StringDeserializer(const std::string& string="");
     ~StringDeserializer();
 
 
     /** \brief Sets the string to deserialize objects from
-    */
+
+        \identifier{7s} */
     void decode(const std::string& string);
   };
 
@@ -231,8 +252,9 @@ namespace casadi {
   public:
      /** \brief Advanced deserialization of CasADi objects
      * 
-     * \seealso FileSerializer
-     */
+     * \see FileSerializer
+
+         \identifier{7t} */
     FileDeserializer(const std::string& fname);
     ~FileDeserializer();
   };

@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -49,8 +49,8 @@ void detect_simple_bounds_gen(const T& x, const T& p,
     casadi_assert(x.is_column(), "Dimension mismatch");
 
     // Get constraint Jacobian sparsity
-    Function temp("temp", {x, p}, {g});
-    Sparsity sp = temp.sparsity_jac(0, 0);
+    Function temp("temp_detect_simple_bounds_gen", {x, p}, {g});
+    Sparsity sp = temp.jac_sparsity().at(0);
     Sparsity spT = sp.T();
 
     // Reset result vector
@@ -81,8 +81,18 @@ void detect_simple_bounds_gen(const T& x, const T& p,
     T f1 = res[0];
     T f2 = res[1];
 
-    T lb = (lbg(sgi)-f1)/abs(f2);
-    T ub = (ubg(sgi)-f1)/abs(f2);
+    T f2_inv = 1/f2;
+
+    T lb_pre = (lbg(sgi)-f1)*f2_inv;
+    T ub_pre = (ubg(sgi)-f1)*f2_inv;
+
+    T pos_f2 = f2>=0;
+    T neg_f2 = !pos_f2;
+
+    T lb = lb_pre*pos_f2+ub_pre*neg_f2;
+    T ub = ub_pre*pos_f2+lb_pre*neg_f2;
+
+
 
     // Start without simple bounds
     lbx = -T::inf(nx);

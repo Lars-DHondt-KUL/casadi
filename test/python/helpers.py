@@ -2,8 +2,8 @@
 #     This file is part of CasADi.
 #
 #     CasADi -- A symbolic framework for dynamic optimization.
-#     Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
-#                             K.U. Leuven. All rights reserved.
+#     Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+#                             KU Leuven. All rights reserved.
 #     Copyright (C) 2011-2014 Greg Horn
 #
 #     CasADi is free software; you can redistribute it and/or
@@ -32,6 +32,18 @@ import itertools
 import time
 from contextlib import contextmanager
 from casadi.tools import capture_stdout
+import os
+
+codegen_check_digits = 15
+
+print("os" in os.environ)
+if "os" in os.environ:
+    print(os.environ["os"])
+    if os.environ["os"]=="osx_arm":
+        # Numerical differences due to different compilers in ci
+        codegen_check_digits = 10
+
+print("codegen_check_digits", codegen_check_digits)
 
 import argparse
 import struct
@@ -42,6 +54,28 @@ else:
   import __builtin__
   builtins = __builtin__
 
+x = MX.sym("x",2,3)
+y = MX.sym("x",3,4)
+
+try:
+  x+y
+except TypeError:
+  swig4 = True
+except RuntimeError:
+  swig4 = False
+
+try:
+  nlpsol(123)
+except Exception as e:
+  if "SXDict" in str(e):
+    systemswig = True
+  elif "dict:SX" in str(e):
+    systemswig = False
+  else:
+    systemswig = True
+
+# Pending deprecation in numpy
+check_matrix = False
 
 platform_arch = 8 * struct.calcsize("P")
 
@@ -129,12 +163,31 @@ def toMX_fun(fun):
   ins = fun.mx_in()
   return Function("f",ins,fun(ins))
 
+def jacobian_old(f, i, j):
+    return f.factory(f.name() + '_jac', f.name_in(),
+        ['jac:' + f.name_out(j) + ':' + f.name_in(i)] + f.name_out())
+
+def hessian_old(f, i, j):
+    return f.factory(f.name() + '_hess', f.name_in(),
+        ['hess:' + f.name_out(j) + ':' + f.name_in(i) + ":" + f.name_in(i),
+        'grad:' + f.name_out(j) + ':' + f.name_in(i)] + f.name_out())
 
 class casadiTestCase(unittest.TestCase):
 
   @classmethod
   def tearDownClass(cls):
     print("STATUS_RAN_ALL_TESTS")
+
+  @contextmanager
+  def assertInAnyOutput(self,s):
+    e = ""
+    with capture_stdout() as result:
+        try:
+          yield
+        except Exception as err:
+          e = str(err)
+    print(result[0])
+    self.assertTrue(s in e or s in result[0] or s in result[1])
 
   @contextmanager
   def assertInException(self,s):
@@ -158,6 +211,20 @@ class casadiTestCase(unittest.TestCase):
       self.assertTrue(e in result[0],msg=result[0] + "<->" + e)
     for e in excluded:
       self.assertFalse(e in result[0],msg=result[0] + "<->" + e)
+      
+  @contextmanager
+  def assertOutputs(self,included_stdout,included_stderr):
+    with capture_stdout() as result:
+      yield
+    if not(isinstance(included_stdout,list)):
+      included_stdout = [included_stdout]
+    if not(isinstance(included_stderr,list)):
+      included_stderr = [included_stderr]
+    for e in included_stdout:
+      self.assertTrue(e in result[0],msg=result[0] + "<->" + e)
+    for e in included_stderr:
+      self.assertTrue(e in result[1],msg=result[1] + "<->" + e)
+      
   def tearDown(self):
     t = time.time() - self.startTime
     print("deltaT %s: %.3f" % ( self.id(), t))
@@ -356,6 +423,40 @@ class casadiTestCase(unittest.TestCase):
       if len(excludeflags.intersection(pool.flags[i]))>0:
         continue
       self.numpyEvaluationCheck(pool.casadioperators[i],pool.numpyoperators[i],x,x0,"%s:%s" % (name,pool.names[i]),"\n I tried to apply %s (%s) from test case '%s' to numerical value %s. But the result returned: " % (str(pool.casadioperators[i]),pool.names[i],name, str(x0)),fmod=fmod,setx0=setx0)
+      
+  def check_eval_mx(self, mx):
+    if isinstance(mx,list):
+        return self.check_eval_mx(vvcat(mx))
+    assert isinstance(mx,MX)
+    args = symvar(mx)
+    f = Function("f",args,[mx])
+    d = MX.sym("d") # dummy
+    #mx_eval = f.call(args,True,False)[0]
+    new_args = [MX.sym(e.name(),e.sparsity()) for e in args]
+    mx_eval = f.call(new_args,True,False)[0]
+    if isinstance(mx_eval,DM):
+        mx = evalf(mx)
+        self.checkarray(mx,mx_eval)
+        return
+    mx_eval = substitute([mx_eval],new_args,args)[0]
+    if isinstance(mx_eval,MX): # In all sparse case, might falsely look like SX
+        self.check_identical_mx(mx_eval,mx)
+
+  def check_identical_fun(self, a, b):
+    s = a.serialize()
+    s2 = b.serialize()
+    a.save('a.casadi',{"debug":True})
+    b.save('b.casadi',{"debug":True})
+    self.assertTrue(s==s2)
+        
+  def check_identical_mx(self, a, b):
+    assert isinstance(a,MX)
+    assert isinstance(b,MX)
+    arg_a = symvar(a)
+    arg_b = symvar(b)
+    fa = Function('f',arg_a,[a])
+    fb = Function('f',arg_b,[b])
+    self.check_identical_fun(fa,fb)    
 
   def checkfunction_light(self,trial,solution,inputs=None,**kwargs):
     self.checkfunction(trial,solution,inputs,fwd=False,adj=False,jacobian=False,gradient=False,hessian=False,sens_der=False,evals=False,**kwargs)
@@ -378,7 +479,7 @@ class casadiTestCase(unittest.TestCase):
 
     for i in range(trial.n_in()):
       if (allow_empty and (trial.sparsity_in(i).is_empty() or solution.sparsity_in(i).is_empty() )): continue
-      message = "input(%d)" % i
+      message = "input(%d: '%s')" % (i, trial.name_in(i))
 
     for i in range(2): # repeated evaluation
       try:
@@ -391,7 +492,7 @@ class casadiTestCase(unittest.TestCase):
       self.assertEqual(trial.n_in(),solution.n_in(),failmessage+": trial has %d inputs while solution has %d." % (trial.n_in(),solution.n_in()) )
 
       for i in range(trial.n_out()):
-        message = "output(%d)" % i
+        message = "output(%d: '%s')" % (i, trial.name_out(i))
         if (allow_empty and (trial.sparsity_out(i).is_empty() or solution.sparsity_out(i).is_empty() )): continue
         if (allow_nondiff and (trial.sparsity_out(i).nnz()==0 or solution.sparsity_out(i).nnz()==0 )): continue
         self.checkarray(trial_outputs[i],solution_outputs[i],"",digits=digits,failmessage=failmessage+": "+message)
@@ -400,10 +501,10 @@ class casadiTestCase(unittest.TestCase):
       for i in range(trial.n_in()):
         if (allow_empty and (trial.sparsity_in(i).is_empty() or solution.sparsity_in(i).is_empty() )): continue
         for j in range(trial.n_out()):
-          trialjac = trial.jacobian_old(i,j)
+          trialjac = jacobian_old(trial, i, j)
           self.assertEqual(trialjac.n_in(),trial.n_in())
           self.assertEqual(trialjac.n_out(),trial.n_out()+1)
-          solutionjac = solution.jacobian_old(i,j)
+          solutionjac = jacobian_old(solution, i, j)
           self.assertEqual(solutionjac.n_in(),solution.n_in())
           self.assertEqual(solutionjac.n_out(),solution.n_out()+1)
 
@@ -414,10 +515,10 @@ class casadiTestCase(unittest.TestCase):
         if (allow_empty and (trial.sparsity_in(i).is_empty() or solution.sparsity_in(i).is_empty() )): continue
         for j in range(trial.n_out()):
           if trial.sparsity_out(j).is_scalar() and solution.sparsity_out(j).is_scalar():
-            trialhess = trial.hessian_old(i,j)
+            trialhess = hessian_old(trial, i, j)
             self.assertEqual(trialhess.n_in(),trial.n_in())
             self.assertEqual(trialhess.n_out(),trial.n_out()+2)
-            solutionhess = solution.hessian_old(i,j)
+            solutionhess = hessian_old(solution, i, j)
             self.assertEqual(solutionhess.n_in(),solution.n_in())
             self.assertEqual(solutionhess.n_out(),solution.n_out()+2)
             self.checkfunction(trialhess,solutionhess,inputs=inputs,fwd=fwd  if sens_der else False,adj=adj  if sens_der else False,jacobian=False,gradient=False,hessian=False,evals=False,digits=digits_sens,failmessage="(%s).hessian_old(%d,%d)" % (failmessage,i,j),allow_empty=allow_empty,verbose=verbose,allow_nondiff=allow_nondiff)
@@ -443,8 +544,8 @@ class casadiTestCase(unittest.TestCase):
         else:
           return ret.sparsity()
 
-      #spmods = [lambda x: x , remove_first, remove_last]
-      spmods = [lambda x: x]
+      spmods = [lambda x: x , remove_first, remove_last]
+      #spmods = [lambda x: x]
       #spmods = [lambda x: x , remove_first]
 
       sym = MX.sym
@@ -467,7 +568,7 @@ class casadiTestCase(unittest.TestCase):
           fseeds = [sym("f",spmod(f.sparsity_in(i))) for i in range(f.n_in())]
           aseeds = [sym("a",spmod2(f.sparsity_out(i)))  for i in range(f.n_out())]
           inputss = [sym("i",f.sparsity_in(i)) for i in range(f.n_in())]
-          res = f.call(inputss,True)
+          res = f.call(inputss,not f.is_a("SXFunction"))
           #print res, "sp", [i.sparsity().dim(True) for i in fseeds]
           opts = {"helper_options": {"is_diff_in": f.is_diff_in(), "is_diff_out": f.is_diff_out()}}
           [fwdsens] = forward(res, inputss, [fseeds],opts)
@@ -532,54 +633,203 @@ class casadiTestCase(unittest.TestCase):
   def check_sparsity(self, a,b):
     self.assertTrue(a==b, msg=str(a) + " <-> " + str(b))
 
-  def check_codegen(self,F,inputs=None, opts=None,std="c89",extralibs="",check_serialize=False,extra_options=None):
+  def compile_external(self,name,source,opts=None,std="c89",extralibs="",check_serialize=False,extra_options=None,main=False,definitions=None,extra_include=[],debug_mode=False):
+    import subprocess
     if args.run_slow:
-      import hashlib
-      name = "codegen_%s" % (hashlib.md5(("%f" % np.random.random()+str(F)+str(time.time())).encode()).hexdigest())
-      if opts is None: opts = {}
-      F.generate(name, opts)
-      import subprocess
-
       libdir = GlobalOptions.getCasadiPath()
       includedir = GlobalOptions.getCasadiIncludePath()
+      includedirs = [includedir,os.path.join(includedir,"highs")]
+      for e in extra_include:
+        includedirs.append(os.path.join(includedir,e))
 
       if isinstance(extralibs,list):
-        extralibs = " " + " ".join([lib + ".lib" if os.name=='nt' else "-l"+lib for lib in extralibs])
+        extralibs_clean = []
+        for lib in extralibs:
+            if os.name=='nt':
+                if "." in lib:
+                    if lib.endswith(".dll"):
+                        extralibs_clean.append(lib[:-4]+".lib")
+                    else:
+                        extralibs_clean.append(lib)
+                else:
+                    extralibs_clean.append(lib+".lib")
+            else:
+                if "." in lib:
+                    extralibs_clean.append(lib)
+                else:
+                    extralibs_clean.append("-l"+lib)
+        extralibs = " " + " ".join(extralibs_clean)
 
       if isinstance(extra_options,bool) or extra_options is None:
         extra_options = ""
       if isinstance(extra_options,list):
         extra_options = " " + " ".join(extra_options)
+      if definitions is None:
+        definitions = []
 
-      if os.name=='nt':
-        commands = "cl.exe /LD {name}.c {extra} /link  /libpath:{libdir}".format(std=std,name=name,libdir=libdir,includedir=includedir,extra=extralibs + extra_options + extralibs + extra_options) 
-        p = subprocess.Popen(commands,shell=True).wait()
+      def get_commands(shared=True):
+        if os.name=='nt':
+          defs = " ".join(["/D"+d for d in definitions])
+          commands = "cl.exe {shared} {definitions} /D_UCRT_NOISY_NAN {includedir} {source} {extra} /link  /libpath:{libdir} /out:{name}.dll /implib:{name}.lib".format(shared="/LD" if shared else "",std=std,source=source,libdir=libdir,includedir=" ".join(["/I" + e for e in includedirs]),extra=extralibs + extra_options + extralibs + extra_options,definitions=defs,name=name)
+          if shared:
+            output = "./" + name + ".dll"
+          else:
+            output = name + ".exe"
+          return [commands, output]
+        else:
+          defs = " ".join(["-D"+d for d in definitions])
+          output = "./" + name + (".so" if shared else "")
+          flags = "-O3"
+          if debug_mode:
+            flags = "-O0 -g"
+          commands = "gcc -pedantic -std={std} -fPIC {shared} -Wall -Werror -Wextra {includedir} -Wno-dangling-pointer -Wno-unknown-warning-option -Wno-unknown-pragmas -Wno-long-long -Wno-unused-parameter {flags} {definitions} {source} -o {name_out} -L{libdir} -Wl,-rpath,{libdir} -Wl,-rpath,.".format(shared="-shared" if shared else "",std=std,source=source,name_out=name+(".so" if shared else ""),flags=flags,libdir=libdir,includedir=" ".join(["-I" + e for e in includedirs]),definitions=defs) + (" -lm" if not shared else "") + extralibs + extra_options
+          if sys.platform=="darwin":
+            commands+= " -Xlinker -rpath -Xlinker {libdir}".format(libdir=libdir)
+            commands+= " -Xlinker -rpath -Xlinker .".format(libdir=libdir)
+          return [commands, output]
 
-        F2 = external(F.name(), "./" + name+ ".dll")
-      else:
-        commands = "gcc -pedantic -std={std} -fPIC -shared -Wall -Werror -Wextra -I{includedir} -Wno-unknown-pragmas -Wno-long-long -Wno-unused-parameter -O3 {name}.c -o {name}.so -L{libdir}".format(std=std,name=name,libdir=libdir,includedir=includedir) + extralibs + extra_options
+      [commands, libname] = get_commands(shared=True)
 
-        p = subprocess.Popen(commands,shell=True).wait()
+      print("compile library",commands)
+      p = subprocess.Popen(commands,shell=True).wait()
+      if sys.platform=="darwin":
+        subprocess.run(["otool","-l",libname])
+      if opts is None: opts = {}
+      return (external(name, libname,opts),libname)
 
+  def check_codegen(self,F,inputs=None, opts=None,std="c89",extralibs="",check_serialize=False,extra_options=None,main=False,main_return_code=0,definitions=None,with_jac_sparsity=False,external_opts=None,with_reverse=False,with_forward=False,extra_include=[],digits=15,debug_mode=False):
+    if not isinstance(main_return_code,list):
+        main_return_code = [main_return_code]
+    if args.run_slow:
+      import hashlib
+      name = "codegen_%s" % (hashlib.md5(("%f" % np.random.random()+str(F)+str(time.time())).encode()).hexdigest())
+      if opts is None: opts = {}
+      if main: opts["main"] = True
+      cg = CodeGenerator(name,opts)
+      cg.add(F,with_jac_sparsity)
+      if with_reverse:
+        cg.add(F.reverse(1), with_jac_sparsity)
+      if with_forward:
+        cg.add(F.forward(1), with_jac_sparsity)
+      cg.generate()
+      import subprocess
 
-        F2 = external(F.name(), "./" + name + ".so")
+      libdir = GlobalOptions.getCasadiPath()
+      includedir = GlobalOptions.getCasadiIncludePath()
+      includedirs = [includedir,os.path.join(includedir,"highs")]
+      for e in extra_include:
+        includedirs.append(os.path.join(includedir,e))
 
+      if isinstance(extralibs,list):
+        extralibs_clean = []
+        for lib in extralibs:
+            if os.name=='nt':
+                if "." in lib:
+                    if lib.endswith(".dll"):
+                        extralibs_clean.append(lib[:-4]+".lib")
+                    else:
+                        extralibs_clean.append(lib)
+                else:
+                    extralibs_clean.append(lib+".lib")
+            else:
+                if "." in lib:
+                    extralibs_clean.append(lib)
+                else:
+                    extralibs_clean.append("-l"+lib)
+        extralibs = " " + " ".join(extralibs_clean)
+
+      if isinstance(extra_options,bool) or extra_options is None:
+        extra_options = ""
+      if isinstance(extra_options,list):
+        extra_options = " " + " ".join(extra_options)
+      if definitions is None:
+        definitions = []
+
+      def get_commands(shared=True):
+        if os.name=='nt':
+          defs = " ".join(["/D"+d for d in definitions])
+          commands = "cl.exe {shared} {definitions} /D_UCRT_NOISY_NAN {includedir} {name}.c {extra} /link  /libpath:{libdir}".format(shared="/LD" if shared else "",std=std,name=name,libdir=libdir,includedir=" ".join(["/I" + e for e in includedirs]),extra=extralibs + extra_options + extralibs + extra_options,definitions=defs)
+          if shared:
+            output = "./" + name + ".dll"
+          else:
+            output = name + ".exe"
+          return [commands, output]
+        else:
+          defs = " ".join(["-D"+d for d in definitions])
+          output = "./" + name + (".so" if shared else "")
+          flags = "-O3"
+          if debug_mode:
+            flags = "-O0 -g"
+          commands = "gcc -pedantic -std={std} -fPIC {shared} -Wall -Werror -Wextra {includedir} -Wno-dangling-pointer -Wno-unknown-warning-option -Wno-unknown-pragmas -Wno-long-long -Wno-unused-parameter {flags} {definitions} {name}.c -o {name_out} -L{libdir} -Wl,-rpath,{libdir} -Wl,-rpath,.".format(shared="-shared" if shared else "",std=std,name=name,name_out=name+(".so" if shared else ""),libdir=libdir,includedir=" ".join(["-I" + e for e in includedirs]),definitions=defs,flags=flags) + (" -lm" if not shared else "") + extralibs + extra_options
+          if sys.platform=="darwin":
+            commands+= " -Xlinker -rpath -Xlinker {libdir}".format(libdir=libdir)
+            commands+= " -Xlinker -rpath -Xlinker .".format(libdir=libdir)
+          return [commands, output]
+
+      [commands, libname] = get_commands(shared=True)
+
+      print("compile library",commands)
+      p = subprocess.Popen(commands,shell=True).wait()
+      #if sys.platform=="darwin":
+      #  subprocess.run(["otool","-l",libname])
+      if external_opts is None: external_opts = {}
+      F2 = external(F.name(), libname,external_opts)
+
+      if main:
+        [commands, exename] = get_commands(shared=False)
+        print("here",commands)
+        env = os.environ
+        if os.name=='nt':
+            env["PATH"] = env["PATH"]+";"+libdir
+        else:
+            env["LD_LIBRARY_PATH"] = libdir
+        p = subprocess.Popen(commands,shell=True,env=env).wait()
+        inputs_main = inputs
+        if isinstance(inputs,dict):
+          inputs_main = F.convert_in(inputs)
+        F.generate_in(F.name()+"_in.txt", inputs_main)
+
+      if main:
+        with open(F.name()+"_out.txt","w") as stdout:
+          with open(F.name()+"_in.txt","r") as stdin:
+            commands = exename+" "+F.name()
+            print(commands+" < " + F.name()+"_in.txt")
+            p = subprocess.Popen(commands,shell=True,stdin=stdin,stdout=stdout)
+            out = p.communicate()
+        print("Return code",p.returncode)
+        assert p.returncode in main_return_code
+        if main_return_code:
+            return
+        
       Fout = F.call(inputs)
       Fout2 = F2.call(inputs)
+
+      if main:
+        outputs = F.generate_out(F.name()+"_out.txt")
+        print(outputs)
+        if isinstance(inputs,dict):
+          outputs = F.convert_out(outputs)
+          for k in F.name_out():
+            self.checkarray(Fout[k],outputs[k],digits=digits)
+        else:
+          for i in range(F.n_out()):
+            self.checkarray(Fout[i],Fout2[i],digits=digits)
 
       if isinstance(inputs, dict):
         self.assertEqual(F.name_out(), F2.name_out())
         for k in F.name_out():
-          self.checkarray(Fout[k],Fout2[k],digits=15)
+          self.checkarray(Fout[k],Fout2[k],digits=digits,failmessage=k)
       else:
         for i in range(F.n_out()):
-          self.checkarray(Fout[i],Fout2[i],digits=15)
+          self.checkarray(Fout[i],Fout2[i],digits=digits)
 
       if self.check_serialize:
         self.check_serialize(F2,inputs=inputs)
+        
+      return F2, libname
 
   def check_thread_safety(self,F,inputs=None,N=20):
-    
+
     FP = F.map(N, 'thread',2)
     FS = F.map(N, 'thread')
     self.checkfunction_light(FP, FS, inputs)
@@ -598,6 +848,23 @@ class casadiTestCase(unittest.TestCase):
       else:
         for i in range(F.n_out()):
           self.checkarray(Fout[i],Fout2[i],digits=16)
+
+
+      if False:
+          import hashlib
+          h = hashlib.md5(F.serialize({"debug":True}).encode("ascii")).hexdigest()
+          path = "serialize_"+casadi.__version__
+          os.makedirs(path, exist_ok=True)
+          F.save(os.path.join(path,h+".casadi"),{"debug":True})
+          DM.set_precision(16)
+          h_in = hashlib.md5(str(inputs).encode("ascii")).hexdigest()
+          DM.set_precision(7)
+          if isinstance(inputs,dict):
+            inputs = F.convert_in(inputs)
+            Fout = F.convert_out(Fout)
+          F.generate_in(os.path.join(path,h+"_"+h_in+"_in.txt"),inputs)
+          F.generate_out(os.path.join(path,h+"_"+ h_in +"_out.txt"),Fout)
+
 
   def check_pure(self,F,inputs=None):
       Fout = F.call(inputs)
@@ -650,11 +917,26 @@ class requires_conic(object):
       print("Not available QP plugin %s, skipping unittests" % self.n)
       return None
 
+class requires_linsol(object):
+  def __init__(self,n):
+    self.n = n
+
+  def __call__(self,c):
+    try:
+      load_linsol(self.n)
+      return c
+    except:
+      print("Not available linsol plugin %s, skipping unittests" % self.n)
+      return None
+
 class requires_nlpsol(object):
   def __init__(self,n):
     self.n = n
 
   def __call__(self,c):
+    import os
+    if "SKIP_" + self.n.upper() + "_TESTS" in os.environ:
+        return None
     try:
       load_nlpsol(self.n)
       return c
@@ -737,7 +1019,8 @@ class memory_heavy(object):
 
   def __call__(self, c):
     print(c)
-    c.__dict__["tag_memory_heavy"] = True
+    if c is not None:
+        c.__dict__["tag_memory_heavy"] = True
     return c
 
 class slow(object):

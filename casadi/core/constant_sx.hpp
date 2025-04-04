@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -39,9 +39,11 @@
 namespace casadi {
 
 /** \brief Represents a constant SX
+
   \author Joel Andersson
   \date 2010
-*/
+
+    \identifier{1jj} */
 class ConstantSX : public SXNode {
 public:
 
@@ -51,16 +53,24 @@ public:
 // Class name
 std::string class_name() const override {return "ConstantSX";}
 
-/** \brief  Get the value must be defined */
+/** \brief  Get the value must be defined
+
+    \identifier{1jk} */
 double to_double() const override = 0;
 
-/** \brief  Properties */
+/** \brief  Properties
+
+    \identifier{1jl} */
 bool is_constant() const override { return true; }
 
-/** \brief  Get the operation */
+/** \brief  Get the operation
+
+    \identifier{1jm} */
 casadi_int op() const override { return OP_CONST;}
 
-/** \brief Check if two nodes are equivalent up to a given depth */
+/** \brief Check if two nodes are equivalent up to a given depth
+
+    \identifier{1jn} */
 bool is_equal(const SXNode* node, casadi_int depth) const override {
   const ConstantSX* n = dynamic_cast<const ConstantSX*>(node);
   return n && n->to_double()==to_double();
@@ -68,7 +78,9 @@ bool is_equal(const SXNode* node, casadi_int depth) const override {
 
 protected:
 
-/** \brief  Print expression */
+/** \brief  Print expression
+
+    \identifier{1jo} */
 std::string print(const std::string& arg1, const std::string& arg2) const override {
    std::stringstream ss;
    ss << to_double();
@@ -77,12 +89,16 @@ std::string print(const std::string& arg1, const std::string& arg2) const overri
 
 };
 
-/** \brief  DERIVED CLASSES */
+/** \brief  DERIVED CLASSES
+
+    \identifier{1jp} */
 
 /** \brief  Represents a constant real SX
+
   \author Joel Andersson
   \date 2010
-*/
+
+    \identifier{1jq} */
 class RealtypeSX : public ConstantSX {
   private:
     /// Constructor is private, use "create" below
@@ -92,6 +108,10 @@ class RealtypeSX : public ConstantSX {
 
     /// Destructor
     ~RealtypeSX() override {
+#ifdef CASADI_WITH_THREADSAFE_SYMBOLICS
+    // Safe access to cached_constants_
+    std::lock_guard<std::mutex> lock(mutex_cached_constants);
+#endif // CASADI_WITH_THREADSAFE_SYMBOLICS
       size_t num_erased = cached_constants_.erase(value);
       assert(num_erased==1);
       (void)num_erased;
@@ -99,6 +119,10 @@ class RealtypeSX : public ConstantSX {
 
     /// Static creator function (use instead of constructor)
     inline static RealtypeSX* create(double value) {
+#ifdef CASADI_WITH_THREADSAFE_SYMBOLICS
+    // Safe access to cached_constants_
+    std::lock_guard<std::mutex> lock(mutex_cached_constants);
+#endif // CASADI_WITH_THREADSAFE_SYMBOLICS
       // Try to find the constant
       CACHING_MAP<double, RealtypeSX*>::iterator it = cached_constants_.find(value);
 
@@ -118,7 +142,9 @@ class RealtypeSX : public ConstantSX {
     }
 
     ///@{
-    /** \brief  Get the value */
+    /** \brief  Get the value
+
+        \identifier{1jr} */
     double to_double() const override { return value;}
     casadi_int to_int() const override { return static_cast<casadi_int>(value);}
     ///@}
@@ -132,18 +158,29 @@ class RealtypeSX : public ConstantSX {
 
   protected:
     /** \brief Hash map of all constants currently allocated
-     * (storage is allocated for it in sx_element.cpp) */
+
+     * (storage is allocated for it in sx_element.cpp)
+
+        \identifier{1js} */
     static CACHING_MAP<double, RealtypeSX*> cached_constants_;
 
-    /** \brief  Data members */
+#ifdef CASADI_WITH_THREADSAFE_SYMBOLICS
+    static std::mutex mutex_cached_constants;
+#endif //CASADI_WITH_THREADSAFE_SYMBOLICS
+
+    /** \brief  Data members
+
+        \identifier{1jt} */
     double value;
 };
 
 
 /** \brief  Represents a constant integer SX
+
   \author Joel Andersson
   \date 2010
-*/
+
+    \identifier{1ju} */
 class IntegerSX : public ConstantSX {
   private:
     /// Constructor is private, use "create" below
@@ -156,6 +193,10 @@ class IntegerSX : public ConstantSX {
 
     /// Destructor
     ~IntegerSX() override {
+#ifdef CASADI_WITH_THREADSAFE_SYMBOLICS
+    // Safe access to cached_constants_
+    std::lock_guard<std::mutex> lock(mutex_cached_constants);
+#endif // CASADI_WITH_THREADSAFE_SYMBOLICS
       size_t num_erased = cached_constants_.erase(value);
       assert(num_erased==1);
       (void)num_erased;
@@ -163,6 +204,10 @@ class IntegerSX : public ConstantSX {
 
     /// Static creator function (use instead of constructor)
     inline static IntegerSX* create(casadi_int value) {
+#ifdef CASADI_WITH_THREADSAFE_SYMBOLICS
+    // Safe access to cached_constants_
+    std::lock_guard<std::mutex> lock(mutex_cached_constants);
+#endif // CASADI_WITH_THREADSAFE_SYMBOLICS
       // Try to find the constant
       CACHING_MAP<casadi_int, IntegerSX*>::iterator it = cached_constants_.find(value);
 
@@ -182,12 +227,16 @@ class IntegerSX : public ConstantSX {
     }
 
     ///@{
-    /** \brief  evaluate function */
+    /** \brief  evaluate function
+
+        \identifier{1jv} */
     double to_double() const override {  return static_cast<double>(value); }
     casadi_int to_int() const override {  return static_cast<casadi_int>(value); }
     ///@}
 
-    /** \brief  Properties */
+    /** \brief  Properties
+
+        \identifier{1jw} */
     bool is_integer() const override { return true; }
 
     void serialize_node(SerializingStream& s) const override {
@@ -198,17 +247,28 @@ class IntegerSX : public ConstantSX {
   protected:
 
     /** \brief Hash map of all constants currently allocated
-     * (storage is allocated for it in sx_element.cpp) */
+
+     * (storage is allocated for it in sx_element.cpp)
+
+        \identifier{1jx} */
     static CACHING_MAP<casadi_int, IntegerSX*> cached_constants_;
 
-    /** \brief  Data members */
+#ifdef CASADI_WITH_THREADSAFE_SYMBOLICS
+    static std::mutex mutex_cached_constants;
+#endif //CASADI_WITH_THREADSAFE_SYMBOLICS
+
+    /** \brief  Data members
+
+        \identifier{1jy} */
     int value;
 };
 
 /** \brief  Represents a zero SX
+
   \author Joel Andersson
   \date 2010
-*/
+
+    \identifier{1jz} */
 class ZeroSX : public ConstantSX {
 private:
   /* Private constructor (singleton class) */
@@ -222,13 +282,17 @@ public:
   /* Destructor */
   ~ZeroSX() override {this->count--;}
   ///@{
-  /** \brief  Get the value */
+  /** \brief  Get the value
+
+      \identifier{1k0} */
   double to_double() const override { return 0;}
   casadi_int to_int() const override { return 0;}
   ///@}
 
   ///@{
-  /** \brief  Properties */
+  /** \brief  Properties
+
+      \identifier{1k1} */
   bool is_integer() const override { return true; }
   bool is_zero() const override { return true; }
   bool is_almost_zero(double tol) const override { return true; }
@@ -241,9 +305,11 @@ public:
 
 
 /** \brief  Represents a one SX
+
   \author Joel Andersson
   \date 2010
-*/
+
+    \identifier{1k2} */
 class OneSX : public ConstantSX {
 private:
   /* Private constructor (singleton class) */
@@ -256,11 +322,15 @@ public:
   }
   /* Destructor */
   ~OneSX() override {this->count--;}
-  /** \brief  Get the value */
+  /** \brief  Get the value
+
+      \identifier{1k3} */
   double to_double() const override { return 1;}
   casadi_int to_int() const override { return 1;}
 
-  /** \brief  Properties */
+  /** \brief  Properties
+
+      \identifier{1k4} */
   bool is_integer() const override { return true; }
   bool is_one() const override { return true; }
 
@@ -272,9 +342,11 @@ public:
 
 
 /** \brief  Represents a minus one SX
+
   \author Joel Andersson
   \date 2010
-*/
+
+    \identifier{1k5} */
 class MinusOneSX : public ConstantSX {
 private:
   /* Private constructor (singleton class) */
@@ -289,13 +361,17 @@ public:
   ~MinusOneSX() override {this->count--;}
 
   ///@{
-  /** \brief  Get the value */
+  /** \brief  Get the value
+
+      \identifier{1k6} */
   double to_double() const override { return -1;}
   casadi_int to_int() const override { return -1;}
   ///@}
 
   ///@{
-  /** \brief  Properties */
+  /** \brief  Properties
+
+      \identifier{1k7} */
   bool is_integer() const override { return true; }
   bool is_minus_one() const override { return true; }
   ///@}
@@ -308,9 +384,11 @@ public:
 
 
 /** \brief  Represents an infinity SX
+
   \author Joel Andersson
   \date 2010
-*/
+
+    \identifier{1k8} */
 class InfSX : public ConstantSX {
 private:
   /* Private constructor (singleton class) */
@@ -323,10 +401,14 @@ public:
   }
   /* Destructor */
   ~InfSX() override {this->count--;}
-  /** \brief  Get the value */
+  /** \brief  Get the value
+
+      \identifier{1k9} */
   double to_double() const override { return std::numeric_limits<double>::infinity();}
 
-  /** \brief  Properties */
+  /** \brief  Properties
+
+      \identifier{1ka} */
   bool is_inf() const override { return true; }
 
   void serialize_node(SerializingStream& s) const override {
@@ -337,9 +419,11 @@ public:
 
 
 /** \brief  Represents a minus infinity SX
+
   \author Joel Andersson
   \date 2010
-*/
+
+    \identifier{1kb} */
 class MinusInfSX : public ConstantSX {
 private:
   /* Private constructor (singleton class) */
@@ -353,10 +437,14 @@ public:
   /* Destructor */
   ~MinusInfSX() override {this->count--;}
 
-  /** \brief  Get the value */
+  /** \brief  Get the value
+
+      \identifier{1kc} */
   double to_double() const override { return -std::numeric_limits<double>::infinity();}
 
-  /** \brief  Properties */
+  /** \brief  Properties
+
+      \identifier{1kd} */
   bool is_minus_inf() const override { return true; }
 
   void serialize_node(SerializingStream& s) const override {
@@ -365,9 +453,11 @@ public:
 };
 
 /** \brief  Represents a not-a-number SX
+
   \author Joel Andersson
   \date 2010
-*/
+
+    \identifier{1ke} */
 class NanSX : public ConstantSX {
 private:
   /* Private constructor (singleton class) */
@@ -380,10 +470,14 @@ public:
   }
   /* Destructor */
   ~NanSX() override {this->count--;}
-  /** \brief  Get the value */
+  /** \brief  Get the value
+
+      \identifier{1kf} */
   double to_double() const override { return std::numeric_limits<double>::quiet_NaN();}
 
-  /** \brief  Properties */
+  /** \brief  Properties
+
+      \identifier{1kg} */
   bool is_nan() const override { return true; }
 
   void serialize_node(SerializingStream& s) const override {

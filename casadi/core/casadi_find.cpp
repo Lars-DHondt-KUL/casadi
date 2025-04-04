@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -24,8 +24,6 @@
 
 
 #include "casadi_find.hpp"
-
-using namespace std;
 
 namespace casadi {
 
@@ -75,11 +73,13 @@ namespace casadi {
 
   void Find::generate(CodeGenerator& g,
                       const std::vector<casadi_int>& arg,
-                      const std::vector<casadi_int>& res) const {
+                      const std::vector<casadi_int>& res,
+                      const std::vector<bool>& arg_is_ref,
+                      std::vector<bool>& res_is_ref) const {
     casadi_int nnz = dep(0).nnz();
     g.local("i", "casadi_int");
     g.local("cr", "const casadi_real", "*");
-    g << "for (i=0, cr=" << g.work(arg[0], nnz) << "; i<" << nnz
+    g << "for (i=0, cr=" << g.work(arg[0], nnz, arg_is_ref[0]) << "; i<" << nnz
       << " && *cr++==0; ++i) {}\n"
       << g.workel(res[0]) << " = ";
     if (dep(0).is_dense()) {

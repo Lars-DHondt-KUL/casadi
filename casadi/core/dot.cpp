@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -24,7 +24,6 @@
 
 
 #include "dot.hpp"
-using namespace std;
 namespace casadi {
 
   Dot::Dot(const MX& x, const MX& y) {
@@ -39,6 +38,20 @@ namespace casadi {
 
   void Dot::eval_mx(const std::vector<MX>& arg, std::vector<MX>& res) const {
     res[0] = arg[0]->get_dot(arg[1]);
+  }
+
+  void Dot::eval_linear(const std::vector<std::array<MX, 3> >& arg,
+                        std::vector<std::array<MX, 3> >& res) const {
+    const std::array<MX, 3>& x = arg[0];
+    const std::array<MX, 3>& y = arg[1];
+    std::array<MX, 3>& f = res[0];
+    MX x12 = x[1]+x[2];
+    f[0] += dot(x[0], y[0]);
+    f[1] += dot(x[0], y[1]);
+    f[1] += dot(x[1], y[0]);
+    f[2] += dot(x[0], y[2]);
+    f[2] += dot(x[1]+x[2], y[1]+y[2]);
+    f[2] += dot(x[2], y[0]);
   }
 
   void Dot::ad_forward(const std::vector<std::vector<MX> >& fseed,
@@ -95,9 +108,13 @@ namespace casadi {
 
   void Dot::generate(CodeGenerator& g,
                       const std::vector<casadi_int>& arg,
-                      const std::vector<casadi_int>& res) const {
+                      const std::vector<casadi_int>& res,
+                      const std::vector<bool>& arg_is_ref,
+                      std::vector<bool>& res_is_ref) const {
     g << g.workel(res[0]) << " = "
-      << g.dot(dep().nnz(), g.work(arg[0], dep(0).nnz()), g.work(arg[1], dep(1).nnz()))
+      << g.dot(dep().nnz(),
+                g.work(arg[0], dep(0).nnz(), arg_is_ref[0]),
+                g.work(arg[1], dep(1).nnz(), arg_is_ref[1]))
       << ";\n";
   }
 

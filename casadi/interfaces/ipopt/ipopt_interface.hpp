@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -30,7 +30,8 @@
 #include "casadi/core/nlpsol_impl.hpp"
 #include "casadi/core/timing.hpp"
 
-/** \defgroup plugin_Nlpsol_ipopt
+/** \defgroup plugin_Nlpsol_ipopt Title
+    \par
  *
  * When in warmstart mode, output NLPSOL_LAM_X may be used as input
  *
@@ -52,7 +53,8 @@
  * Change the 'fixed_variable_treatment' to 'make_constraint' or 'relax_bounds' to obtain
  * correct results.
  *
- */
+
+    \identifier{21y} */
 
 /** \pluginsection{Nlpsol,ipopt} **/
 
@@ -191,11 +193,32 @@ namespace casadi {
     Dict var_string_md_, var_integer_md_, var_numeric_md_,
       con_string_md_, con_integer_md_, con_numeric_md_;
 
+    bool clip_inactive_lam_;
+    std::string inactive_lam_strategy_;
+    double inactive_lam_value_;
+
     /// Data for convexification
     ConvexifyData convexify_data_;
 
     /// convexify?
     bool convexify_;
+
+    void set_ipopt_prob(CodeGenerator& g) const;
+
+    /** \brief Generate code for the function body */
+    void codegen_body(CodeGenerator& g) const override;
+
+    /** \brief Generate code for the declarations of the C function */
+    void codegen_declarations(CodeGenerator& g) const override;
+
+    /** \brief Codegen alloc_mem */
+    void codegen_init_mem(CodeGenerator& g) const override;
+
+    /** \brief Codegen free_mem */
+    void codegen_free_mem(CodeGenerator& g) const override;
+
+    /** \brief Thread-local memory object type */
+    std::string codegen_mem_type() const override { return "struct casadi_ipopt_data"; }
 
     /** \brief Serialize an object without type information */
     void serialize_body(SerializingStream &s) const override;

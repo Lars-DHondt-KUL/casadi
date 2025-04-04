@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -26,489 +26,839 @@
 #ifndef CASADI_DAE_BUILDER_HPP
 #define CASADI_DAE_BUILDER_HPP
 
-#include "variable.hpp"
+#include "function.hpp"
 
 namespace casadi {
 
-  // Forward declarations
-  class XmlNode;
+// Forward declarations
+class DaeBuilderInternal;
 
-  /** \brief An initial-value problem in differential-algebraic equations
-      <H3>Independent variables:  </H3>
-      \verbatim
-      t:      time
-      \endverbatim
+/** \brief A symbolic representation of a differential-algebraic equations model
 
-      <H3>Time-continuous variables:  </H3>
-      \verbatim
-      x:      states defined by ODE
-      s:      implicitly defined states
-      z:      algebraic variables
-      u:      control signals
-      q:      quadrature states
-      y:      outputs
-      \endverbatim
+    <H3>Variables:  </H3>
+    \verbatim
+    t:      independent variable (usually time)
+    c:      constants
+    p:      parameters
+    d:      dependent parameters (time independent)
+    u:      controls
+    w:      dependent variables  (time dependent)
+    x:      differential states
+    z:      algebraic variables
+    q:      quadrature states
+    y:      outputs
+    \endverbatim
 
-      <H3>Time-constant variables:  </H3>
-      \verbatim
-      p:      free parameters
-      d:      dependent parameters
-      \endverbatim
+    <H3>Equations:  </H3>
+    \verbatim
+    differential equations: \dot{x} ==  ode(...)
+    algebraic equations:          0 ==  alg(...)
+    quadrature equations:   \dot{q} == quad(...)
+    dependent parameters:         d == ddef(d_prev,p)
+    dependent variables:          w == wdef(w_prev,x,z,u,p,t)
+    output equations:             y == ydef(...)
+    initial equations:     init_lhs == init_rhs(...)
+    events:      when when_cond < 0: when_lhs := when_rhs
+    \endverbatim
 
-      <H3>Dynamic constraints (imposed everywhere):  </H3>
-      \verbatim
-      ODE                    \dot{x} ==  ode(t, x, s, z, u, p, d)
-      DAE or implicit ODE:         0 ==  dae(t, x, s, z, u, p, d, sdot)
-      algebraic equations:         0 ==  alg(t, x, s, z, u, p, d)
-      quadrature equations:  \dot{q} == quad(t, x, s, z, u, p, d)
-      dependent parameters:        d == ddef(t, x, s, z, u, p, d)
-      output equations:            y == ydef(t, x, s, z, u, p, d)
-      \endverbatim
+    \date 2012-2021
+    \author Joel Andersson
 
-      <H3>Point constraints (imposed pointwise):  </H3>
-      \verbatim
-      Initial equations:           0 == init(t, x, s, z, u, p, d, sdot)
-      \endverbatim
+    \identifier{5c} */
+class CASADI_EXPORT DaeBuilder
+  : public SharedObject,
+    public SWIG_IF_ELSE(PrintableCommon, Printable<DaeBuilder>) {
+ public:
 
-      \date 2012-2015
-      \author Joel Andersson
-  */
-  class CASADI_EXPORT DaeBuilder
-    : public SWIG_IF_ELSE(PrintableCommon, Printable<DaeBuilder>) {
-  public:
+  /// Readable name of the class
+  std::string type_name() const {return "DaeBuilder";}
 
-    /// Default constructor
-    DaeBuilder();
+  /// Default constructor
+  DaeBuilder();
 
-    /** @name Variables and equations
-     *  Public data members
-     */
-    ///@{
-    /** \brief Independent variable (usually time) */
-    MX t;
+  /// Construct a DaeBuilder instance
+  explicit DaeBuilder(const std::string& name, const std::string& path = "",
+    const Dict& opts = Dict());
 
-    /** \brief Differential states defined by ordinary differential equations (ODE)
-     */
-    std::vector<MX> x, ode, lam_ode;
+  /** \brief Name of instance
 
-    /** \brief Differential-algebraic equation (DAE) with corresponding state vector,
-     * state derivatives.
-     */
-    std::vector<MX> s, sdot, dae, lam_dae;
+      \identifier{5d} */
+  const std::string& name() const;
 
-    /** \brief Algebraic equations and corresponding algebraic variables
-     * \a alg and \a z have matching dimensions and
-     * <tt>0 == alg(z, ...)</tt> implicitly defines \a z.
-     */
-    std::vector<MX> z, alg, lam_alg;
+  /** @name Variables and equations */
+  ///@{
+  /** \brief Expression for independent variable (usually time)
 
-    /** \brief Quadrature states
-     * Quadrature states are defined by ODEs whose state does not enter in the right-hand-side.
-     */
-    std::vector<MX> q, quad, lam_quad;
+      \identifier{2by} */
+  const MX& time() const;
 
+  /** \brief Independent variable (usually time)
 
-    /** \brief Local variables and corresponding definitions
-     */
-    std::vector<MX> w, wdef, lam_wdef;
+      \identifier{2bz} */
+  std::vector<std::string> t_new() const {return all("t");}
 
-    /** \brief Output variables and corresponding definitions
-     */
-    std::vector<MX> y, ydef, lam_ydef;
+  /** \brief Differential states
 
-    /** \brief Free controls
-     * The trajectories of the free controls are decision variables of the optimal control problem.
-     * They are chosen by the optimization algorithm in order to minimize the cost functional.
-     */
-    std::vector<MX> u;
+      \identifier{5f} */
+  std::vector<std::string> x() const {return all("x");}
 
-    /** \brief Parameters
-     * A parameter is constant over time, but whose value is chosen by e.g. an
-     * optimization algorithm.
-     */
-    std::vector<MX> p;
+  /// Outputs */
+  std::vector<std::string> y() const;
 
-    /** \brief Named constants */
-    std::vector<MX> c, cdef;
+  /** \brief Ordinary differential equations (ODE)
 
-    /** \brief Dependent parameters and corresponding definitions
-     * Interdependencies are allowed but must be non-cyclic.
-     */
-    std::vector<MX> d, ddef, lam_ddef;
-    ///@}
+      \identifier{5g} */
+  std::vector<MX> ode() const;
 
-    /** \brief Auxiliary variables: Used e.g. to define functions */
-    std::vector<MX> aux;
+  /** \brief Algebraic variables
 
-    /** \brief Initial conditions
-     * At <tt>t==0</tt>, <tt>0 == init(sdot, s, ...)</tt> holds in addition to
-     * the ode and/or dae.
-     */
-    std::vector<MX> init;
-    ///@}
+      \identifier{5h} */
+  std::vector<std::string> z() const {return all("z");}
 
-    /** @name Symbolic modeling
-     *  Formulate an optimal control problem
-     */
-    ///@{
-    /// Add a new parameter
-    MX add_p(const std::string& name=std::string(), casadi_int n=1);
+  /** \brief Algebraic equations
 
-    /// Add a new control
-    MX add_u(const std::string& name=std::string(), casadi_int n=1);
+      \identifier{5i} */
+  std::vector<MX> alg() const;
 
-    /// Add a new differential state
-    MX add_x(const std::string& name=std::string(), casadi_int n=1);
+  /** \brief Quadrature states
 
-    /// Add a implicit state
-    std::pair<MX, MX> add_s(const std::string& name=std::string(), casadi_int n=1);
+      \identifier{5j} */
+  std::vector<std::string> q() const {return all("q");}
 
-    /// Add a new algebraic variable
-    MX add_z(const std::string& name=std::string(), casadi_int n=1);
+  /** \brief Quadrature equations
 
-    /// Add a new quadrature state
-    MX add_q(const std::string& name=std::string(), casadi_int n=1);
+      \identifier{5k} */
+  std::vector<MX> quad() const;
 
-    /// Add a new dependent parameter
-    MX add_d(const std::string& name, const MX& new_ddef);
+  /** \brief Zero-crossing functions
 
-    /// Add a new output
-    MX add_y(const std::string& name, const MX& new_ydef);
+      \identifier{2b0} */
+  std::vector<MX> zero() const;
 
-    /// Add an ordinary differential equation
-    void add_ode(const std::string& name, const MX& new_ode);
+  /** \brief Definitions of output variables
 
-    /// Add a differential-algebraic equation
-    void add_dae(const std::string& name, const MX& new_dae);
+      \identifier{5m} */
+  std::vector<MX> ydef() const;
 
-    /// Add an algebraic equation
-    void add_alg(const std::string& name, const MX& new_alg);
+  /** \brief Free controls
 
-    /// Add a quadrature equation
-    void add_quad(const std::string& name, const MX& new_quad);
+      \identifier{5n} */
+  std::vector<std::string> u() const {return all("u");}
 
-    /// Add an auxiliary variable
-    MX add_aux(const std::string& name=std::string(), casadi_int n=1);
+  /** \brief Parameters
 
-    /// Check if dimensions match
-    void sanity_check() const;
-    ///@}
+      \identifier{5o} */
+  std::vector<std::string> p() const {return all("p");}
 
-    /** @name Manipulation
-     *  Reformulate the dynamic optimization problem.
-     */
-    ///@{
+  /** \brief Named constants
 
-    /// Identify and separate the algebraic variables and equations in the DAE
-    void split_dae();
+      \identifier{5p} */
+  std::vector<std::string> c() const {return all("c");}
 
-    /// Eliminate algebraic variables and equations transforming them into outputs
-    void eliminate_alg();
+  /** \brief Definitions of named constants
 
-    /// Transform the implicit DAE to a semi-explicit DAE
-    void make_semi_explicit();
+      \identifier{5q} */
+  std::vector<MX> cdef() const;
 
-    /// Transform the implicit DAE or semi-explicit DAE into an explicit ODE
-    void make_explicit();
+  /** \brief Dependent parameters
 
-    /// Sort dependent parameters
-    void sort_d();
+      \identifier{5r} */
+  std::vector<std::string> d() const {return all("d");}
 
-    /// Eliminate interdependencies amongst dependent parameters
-    void split_d();
+  /** \brief Definitions of dependent parameters
 
-    /// Eliminate dependent parameters
-    void eliminate_d();
+    * Interdependencies are allowed but must be non-cyclic.
 
-    /// Eliminate quadrature states and turn them into ODE states
-    void eliminate_quad();
+      \identifier{5s} */
+  std::vector<MX> ddef() const;
 
-    /// Sort the DAE and implicitly defined states
-    void sort_dae();
+  /** \brief Dependent variables
 
-    /// Sort the algebraic equations and algebraic states
-    void sort_alg();
+      \identifier{5t} */
+  std::vector<std::string> w() const {return all("w");}
 
-    /// Scale the variables
-    void scale_variables();
+  /** \brief Dependent variables and corresponding definitions
 
-    /// Scale the implicit equations
-    void scale_equations();
-    ///@}
+   * Interdependencies are allowed but must be non-cyclic.
 
-    /** @name Functions
-     *  Add or load auxiliary functions
-     */
-    ///@{
+      \identifier{5u} */
+  std::vector<MX> wdef() const;
 
-    /// Add a function from loaded expressions
-    Function add_fun(const std::string& name,
-                     const std::vector<std::string>& arg,
-                     const std::vector<std::string>& res, const Dict& opts=Dict());
+  /** \brief Initial conditions, left-hand-side
 
-    /// Add an already existing function
-    Function add_fun(const Function& f);
+      \identifier{2b1} */
+  std::vector<MX> init_lhs() const;
 
-    /// Add an external function
-    Function add_fun(const std::string& name, const Importer& compiler,
-                     const Dict& opts=Dict());
+  /** \brief Initial conditions, right-hand-side
 
-    /// Does a particular function already exist?
-    bool has_fun(const std::string& name) const;
+      \identifier{2b2} */
+  std::vector<MX> init_rhs() const;
 
-    /// Get function by name
-    Function fun(const std::string& name) const;
+  /** \brief Model structure: outputs
+
+      \identifier{61} */
+  std::vector<std::string> outputs() const;
+
+  /** \brief Model structure: derivatives
+
+      \identifier{62} */
+  std::vector<std::string> derivatives() const;
+
+  /** \brief Model structure: initial unknowns
+
+      \identifier{63} */
+  std::vector<std::string> initial_unknowns() const;
+
+  /** @name Variables and equations */
+  ///@{
+
+  /** \brief Is there a time variable?
+
+      \identifier{64} */
+  bool has_t() const;
+
+  /** \brief Differential states
+
+      \identifier{65} */
+  casadi_int nx() const;
+
+  /** \brief Algebraic variables
+
+      \identifier{66} */
+  casadi_int nz() const;
+
+  /** \brief Quadrature states
+
+      \identifier{67} */
+  casadi_int nq() const;
+
+  /** \brief Zero-crossing functions
+
+      \identifier{2cb} */
+  casadi_int nzero() const;
+
+  /** \brief Output variables
+
+      \identifier{68} */
+  casadi_int ny() const;
+
+  /** \brief Free controls
+
+      \identifier{69} */
+  casadi_int nu() const;
+
+  /** \brief Parameters
+
+      \identifier{6a} */
+  casadi_int np() const;
+
+  /** \brief Named constants
+
+      \identifier{6b} */
+  casadi_int nc() const;
+
+  /** \brief Dependent parameters
+
+      \identifier{6c} */
+  casadi_int nd() const;
+
+  /** \brief Dependent variables
+
+      \identifier{6d} */
+  casadi_int nw() const;
   ///@}
 
-    /** @name Import and export
-     */
-    ///@{
-    /// Import existing problem from FMI/XML
-    void parse_fmi(const std::string& filename);
+  /** @name Symbolic modeling
+   *  Formulate a dynamic system model
+   */
+  ///@{
+
+  /// Add a new model variable
+  MX add(const std::string& name,
+    const std::string& causality,
+    const std::string& variability,
+    const Dict& opts=Dict());
+
+  /// Add a new model variable, default variability
+  MX add(const std::string& name,
+    const std::string& causality,
+    const Dict& opts=Dict());
+
+  /// Add a new model variable, default variability and causality
+  MX add(const std::string& name,
+    const Dict& opts=Dict());
+
+  /// Add a new model variable, symbolic expression already available
+  void add(const std::string& name,
+    const std::string& causality,
+    const std::string& variability,
+    const MX& expr,
+    const Dict& opts=Dict());
+
+#ifdef WITH_DEPRECATED_FEATURES
+  /// [DEPRECATED] Renamed "time"
+  const MX& t() const { return time();}
+
+  /// [DEPRECATED] Replaced by add
+  MX add_t(const std::string& name="t");
+
+  /// [DEPRECATED] Replaced by add
+  MX add_p(const std::string& name=std::string());
+
+  /// [DEPRECATED] Replaced by add
+  MX add_u(const std::string& name=std::string());
+
+  /// [DEPRECATED] Replaced by add
+  MX add_x(const std::string& name=std::string());
+
+  /// [DEPRECATED] Replaced by add
+  MX add_z(const std::string& name=std::string());
+
+  /// [DEPRECATED] Replaced by add
+  MX add_q(const std::string& name=std::string());
+
+  /// [DEPRECATED] Replaced by add and eq
+  MX add_c(const std::string& name, const MX& new_cdef);
+
+  /// [DEPRECATED] Replaced by add and eq
+  MX add_d(const std::string& name, const MX& new_ddef);
+
+  /// [DEPRECATED] Replaced by add and eq
+  MX add_w(const std::string& name, const MX& new_wdef);
+
+  /// [DEPRECATED] Replaced by add and eq
+  MX add_y(const std::string& name, const MX& new_ydef);
+
+  /// [DEPRECATED] Replaced by eq
+  void set_beq(const std::string& name, const MX& val);
+
+  #endif  // WITH_DEPRECATED_FEATURES
+
+  /// Add a simple equation
+  void eq(const MX& lhs, const MX& rhs, const Dict& opts=Dict());
+
+  /// Add when equations
+  void when(const MX& cond, const std::vector<std::string>& eqs, const Dict& opts=Dict());
+
+  /// Assignment inside a when-equation or if-else equation
+  std::string assign(const std::string& name, const MX& val);
+
+  /// Reinitialize a state inside when-equations
+  std::string reinit(const std::string& name, const MX& val);
+
+  /// Specify the initial equation for a variable
+  void set_init(const std::string& name, const MX& init_rhs);
+
+#ifdef WITH_DEPRECATED_FEATURES
+  /// [DEPRECATED] Replaced by eq
+  void set_ode(const std::string& name, const MX& ode_rhs) {
+    eq(var(name), ode_rhs);
+  }
+
+  /// [DEPRECATED] Replaced by eq
+  void set_alg(const std::string& name, const MX& alg_rhs) {
+    (void)name;
+    eq(0, alg_rhs);
+  }
+
+  /// [DEPRECATED] Replaced by set_init
+  void add_init(const MX& lhs, const MX& rhs) {
+    set_init(lhs.name(), rhs);
+  }
+
+  /// [DEPRECATED] Replaced by nzero()
+  casadi_int ne() const {return nzero();}
+
+  /// [DEPRECATED] Use all("zero") */
+  std::vector<std::string> e() const {return all("zero");}
+
+  #endif  // WITH_DEPRECATED_FEATURES
+
+  /// Check if dimensions match
+  void sanity_check() const;
+  ///@}
+
+  /// Reorder variables in a category
+  void reorder(const std::string& cat, const std::vector<std::string>& v);
+
+#ifdef WITH_DEPRECATED_FEATURES
+  /// [DEPRECATED] Use set_variability, set_causality or set_category to change variable category
+  void clear_all(const std::string& v);
+
+  /// [DEPRECATED] Use set_variability, set_causality, set_category and/or reorder
+  void set_all(const std::string& v, const std::vector<std::string>& name);
+
+  /** @name [DEPRECATED] Register an existing variable */
+  ///@{
+  void register_t(const std::string& name);
+  void register_p(const std::string& name);
+  void register_u(const std::string& name);
+  void register_x(const std::string& name);
+  void register_z(const std::string& name);
+  void register_q(const std::string& name);
+  void register_c(const std::string& name);
+  void register_d(const std::string& name);
+  void register_w(const std::string& name);
+  void register_y(const std::string& name);
+  void register_e(const std::string& name);
+  ///@}
+
+  /// [DEPRECATED] Use eliminate("d")
+  void eliminate_d();
+
+  /// [DEPRECATED] Use eliminate("w")
+  void eliminate_w();
+
+  /// [DEPRECATED] Use eliminate("q")
+  void eliminate_quad();
+
+  /// [DEPRECATED] Use sort("d")
+  void sort_d();
+
+  /// [DEPRECATED] Use sort("w")
+  void sort_w();
+
+  /// [DEPRECATED] Use reorder("z", new_order)
+  void sort_z(const std::vector<std::string>& z_order);
+
+  #endif // WITH_DEPRECATED_FEATURES
+
+  /** @name Manipulation
+   *  Reformulate the dynamic optimization problem.
+   */
+  ///@{
+
+
+  /// Eliminate all dependent parameters
+  void eliminate(const std::string& cat);
+
+  /// Sort dependent parameters
+  void sort(const std::string& cat);
+
+  /// Lift problem formulation by extracting shared subexpressions
+  void lift(bool lift_shared = true, bool lift_calls = true);
+
+  /// Prune unused controls
+  void prune(bool prune_p = true, bool prune_u = true);
+
+  /// Identify iteration variables and residual equations using naming convention
+  void tear();
+  ///@}
+
+  /** @name Functions
+   *  Add or load auxiliary functions
+   */
+  ///@{
+
+  /// Add a function from loaded expressions
+  Function add_fun(const std::string& name,
+                   const std::vector<std::string>& arg,
+                   const std::vector<std::string>& res, const Dict& opts=Dict());
+
+  /// Add an already existing function
+  Function add_fun(const Function& f);
+
+  /// Add an external function
+  Function add_fun(const std::string& name, const Importer& compiler,
+                   const Dict& opts=Dict());
+
+  /// Does a particular function already exist?
+  bool has_fun(const std::string& name) const;
+
+  /// Get function by name
+  Function fun(const std::string& name) const;
+
+  /// Get all functions
+  std::vector<Function> fun() const;
+
+  /// Collect embedded functions from the expression graph
+  void gather_fun(casadi_int max_depth = -1);
+///@}
+
+  /** @name Import and export
+   */
+  ///@{
+  /// Import existing problem from FMI/XML
+  void parse_fmi(const std::string& filename) {load_fmi_description(filename); }
+
+  /// Does the FMU provide support for analytic derivatives
+  bool provides_directional_derivatives() const;
+
+  /// Does the FMU provide support for analytic derivatives (FMI 2 naming)
+  bool provides_directional_derivative() const {return provides_directional_derivatives();}
+
+  /// Import problem description from FMI or XML
+  void load_fmi_description(const std::string& filename);
+
+  /// Export instance into an FMU
+  std::vector<std::string> export_fmu(const Dict& opts=Dict());
+
+  /// Add a named linear combination of output expressions
+  void add_lc(const std::string& name, const std::vector<std::string>& f_out);
+
+  /// Construct a function object, legacy syntax
+  Function create(const std::string& fname,
+    const std::vector<std::string>& name_in,
+    const std::vector<std::string>& name_out, bool sx, bool lifted_calls = false) const;
+
+  /** \brief  Construct a function object, names provided
+
+    \param name    Name assigned to the resulting function object
+    \param name_in   Names of all the inputs
+    \param name_out  Names of all the outputs
+    \param opts    Optional settings
+
+      \identifier{6e} */
+  Function create(const std::string& name,
+    const std::vector<std::string>& name_in,
+    const std::vector<std::string>& name_out,
+    const Dict& opts=Dict()) const;
+  ///@}
+
+  /** \brief Create a function with standard integrator DAE signature
+
+    \param name    Name assigned to the resulting function object
+    \param opts    Optional settings
+
+      \identifier{2c0} */
+  Function create(const std::string& fname, const Dict& opts=Dict()) const;
+
+  /** \brief Create a function with standard integrator DAE signature, default naming
+
+      \identifier{2c1} */
+  Function create() const {return create(name() + "_dae");}
+
+  /// Construct a function for evaluating dependent parameters
+  Function dependent_fun(const std::string& fname,
+      const std::vector<std::string>& s_in,
+      const std::vector<std::string>& s_out) const;
+
+  /// Construct a function describing transition at a specific events
+  Function transition(const std::string& fname, casadi_int index) const;
+
+  /// Construct a function describing transition at any events
+  Function transition(const std::string& fname) const;
+
+  /// Construct an event transition function, default naming
+  Function transition() const {return transition(name() + "_transition");}
+
+  ///@{
+  /// Get variable expression by name
+  MX var(const std::string& name) const;
+  MX operator()(const std::string& name) const {return var(name);}
+  ///@}
+
+  /// Get the time derivative of model variables
+  std::vector<std::string> der(const std::vector<std::string>& name) const;
+
+  ///@{
+  /// Differentiate an expression with respect to time
+  MX der(const MX& v) const;
+  MX der(const MX& v);
+  ///@}
+
+  /// Get the pre-variables of model variables
+  std::vector<std::string> pre(const std::vector<std::string>& name) const;
+
+  /// Get the pre-expression given variable expression
+  MX pre(const MX& v) const;
+
+  /// Does a variable have a binding equation?
+  bool has_beq(const std::string& name) const;
+
+  /// Get the binding equation for a variable
+  MX beq(const std::string& name) const;
+
+  ///@{
+  /// Get/set value reference
+  casadi_int value_reference(const std::string& name) const;
+  void set_value_reference(const std::string& name, casadi_int val);
+  ///@}
+
+  ///@{
+  /// Get/set description
+  std::string description(const std::string& name) const;
+  void set_description(const std::string& name, const std::string& val);
+  ///@}
+
+  ///@{
+  /// Get/set the type
+  std::string type(const std::string& name, casadi_int fmi_version = 3) const;
+  void set_type(const std::string& name, const std::string& val);
+  ///@}
+
+  /// Get the causality
+  std::string causality(const std::string& name) const;
+
+  /** \brief Set the causality, if permitted
+
+  The following changes are permitted:
+    * For controls 'u' (variability 'continuous', causality 'input'), free parameters 'p'
+    (variability 'tunable', causality 'parameter') and fixed parameters 'c' (variability
+    'fixed', causality 'parameter'), causality can only be changed indirectly, by updating
+    the variability
+    * Add or remove an output 'y' by setting the causality to 'output' or 'local',
+    respectively
+
+    No other changes are permitted.
+
+      \identifier{2c2} */
+  void set_causality(const std::string& name, const std::string& val);
+
+  /// Get the variability
+  std::string variability(const std::string& name) const;
+
+  /** \brief Set the variability, if permitted
+
+  For controls 'u' (variability 'continuous', causality 'input'), free parameters 'p'
+  (variability 'tunable', causality 'parameter') and fixed parameters 'c'
+  (variability 'fixed', causality 'parameter'), update variability in
+  order to change the category. Causality is updated accordingly.
+
+  Other changes are not permitted
+
+      \identifier{2c3} */
+  void set_variability(const std::string& name, const std::string& val);
+
+  /// Get the variable category
+  std::string category(const std::string& name) const;
+
+  /** \brief Set the variable category, if permitted
+
+  The following changes are permitted:
+    * Controls 'u' can be changed to/from tunable parameters 'p' or fixed parameters 'c'
+    * Differential states that do not appear in the right-hand-sides can be changed between
+    regular states 'x' and quadrature states 'q'
+
+    Other changes are not permitted. Causality and variability is updated accordingly.
+
+      \identifier{2c4} */
+  void set_category(const std::string& name, const std::string& val);
+
+  ///@{
+  /// Get/set the initial property
+  std::string initial(const std::string& name) const;
+  void set_initial(const std::string& name, const std::string& val);
+  ///@}
+
+  ///@{
+  /// Get/set the unit
+  std::string unit(const std::string& name) const;
+  void set_unit(const std::string& name, const std::string& val);
+  ///@}
+
+  ///@{
+  /// Get/set the display unit
+  std::string display_unit(const std::string& name) const;
+  void set_display_unit(const std::string& name, const std::string& val);
+  ///@}
+
+  /// Get the number of elements of a variable
+  casadi_int numel(const std::string& name) const;
+
+  /// Get the dimensions of a variable
+  std::vector<casadi_int> dimension(const std::string& name) const;
+
+  /// Get the start time
+  double start_time() const;
+
+  /// Set the start time
+  void set_start_time(double val);
+
+  /// Get the stop time
+  double stop_time() const;
+
+  /// Set the stop time
+  void set_stop_time(double val);
+
+  /// Get the tolerance
+  double tolerance() const;
+
+  /// Set the tolerance
+  void set_tolerance(double val);
+
+  /// Get the step size
+  double step_size() const;
+
+  /// Set the step size
+  void set_step_size(double val);
+
+  // The following routines are not needed in MATLAB and would cause ambiguity
+  // Note that a multirow strings can be interpreted as a vector of strings
+#if !(defined(SWIG) && defined(SWIGMATLAB))
+  /// Get the time derivative of model variables, single variable
+  std::string der(const std::string& name) const;
+
+  /// Get the pre-variables of model variables
+  std::string pre(const std::string& name) const;
+
+  /// Get an attribute, single variable
+  double attribute(const std::string& a, const std::string& name) const;
+
+  /// Set an attribute, single variable
+  void set_attribute(const std::string& a, const std::string& name, double val);
+
+  /// Get the lower bound, single variable
+  double min(const std::string& name) const;
+
+  /// Set the lower bound, single variable
+  void set_min(const std::string& name, double val);
+
+  /// Get the upper bound, single variable
+  double max(const std::string& name) const;
+
+  /// Set the upper bound, single variable
+  void set_max(const std::string& name, double val);
+
+  /// Get the nominal value, single variable
+  double nominal(const std::string& name) const;
+
+  /// Set the nominal value, single variable
+  void set_nominal(const std::string& name, double val);
+
+  /// Get the start attribute, single variable
+  std::vector<double> start(const std::string& name) const;
+
+  /// Set the start attribute, single variable
+  void set_start(const std::string& name, double val);
+
+  /// Set the start attribute, vector argument
+  void set_start(const std::string& name, const std::vector<double>& val);
+
+  // Clear all set values
+  void reset();
+
+  // Set the current value, single value
+  void set(const std::string& name, double val);
+
+  // Set the current value, single value (string)
+  void set(const std::string& name, const std::string& val);
+
+  /// Evaluate the values for a set of variables at the initial time, single value
+  GenericType get(const std::string& name) const;
+
+#endif  // !SWIGMATLAB
+
+  /// Get an attribute
+  std::vector<double> attribute(const std::string& a, const std::vector<std::string>& name) const;
+
+  /// Set an attribute
+  void set_attribute(const std::string& a, const std::vector<std::string>& name,
+    const std::vector<double>& val);
+
+  /// Get the lower bound
+  std::vector<double> min(const std::vector<std::string>& name) const;
+
+  /// Set the lower bound
+  void set_min(const std::vector<std::string>& name, const std::vector<double>& val);
+
+  /// Get the upper bound
+  std::vector<double> max(const std::vector<std::string>& name) const;
+
+  /// Set the upper bound
+  void set_max(const std::vector<std::string>& name, const std::vector<double>& val);
+
+  /// Get the nominal value
+  std::vector<double> nominal(const std::vector<std::string>& name) const;
+
+  /// Set the nominal value
+  void set_nominal(const std::vector<std::string>& name, const std::vector<double>& val);
+
+  /// Get the start attribute
+  std::vector<double> start(const std::vector<std::string>& name) const;
+
+  /// Set the start attribute
+  void set_start(const std::vector<std::string>& name, const std::vector<double>& val);
+
+  /// Set the current value
+  void set(const std::vector<std::string>& name, const std::vector<double>& val);
+
+  /// Set the current value (string)
+  void set(const std::vector<std::string>& name, const std::vector<std::string>& val);
+
+  /// Evaluate the values for a set of variables at the initial time
+  std::vector<GenericType> get(const std::vector<std::string>& name) const;
+
+  /// Check if a particular variable exists
+  bool has(const std::string& name) const;
+
+  /// Get a list of all variables
+  std::vector<std::string> all() const;
+
+  /// Get a list of all variables of a particular category
+  std::vector<std::string> all(const std::string& cat) const;
+
+#ifdef WITH_DEPRECATED_FEATURES
+  /// [DEPRECATED] Use add
+  MX add_variable(const std::string& name, casadi_int n=1);
+
+  /// [DEPRECATED] Use add
+  MX add_variable(const std::string& name, const Sparsity& sp);
+
+  /// Add a new variable from symbolic expressions
+  void add_variable(const MX& new_v);
+
+  /// [DEPRECATED] Use add
+  size_t add_variable_new(const std::string& name, casadi_int n=1);
+
+  /// [DEPRECATED] Use add
+  size_t add_variable_new(const std::string& name, const Sparsity& sp);
+
+  /// [DEPRECATED] Use add
+  size_t add_variable_new(const MX& new_v);
+
+  /// [DEPRECATED] Ranamed "has"
+  bool has_variable(const std::string& name) const {return has(name);}
+
+  /// Get a list of all variables
+  std::vector<std::string> all_variables() const {return all();}
+#endif // WITH_DEPRECATED_FEATURES
+
+  /// Get the (cached) oracle, SX or MX
+  Function oracle(bool sx = false, bool elim_w = false, bool lifted_calls = false) const;
+
+  /** \brief Get Jacobian sparsity
+
+      \identifier{6g} */
+  Sparsity jac_sparsity(const std::vector<std::string>& onames,
+    const std::vector<std::string>& inames) const;
 
 #ifndef SWIG
-    // Input convension in codegen
-    enum DaeBuilderIn {
-      DAE_BUILDER_T,
-      DAE_BUILDER_C,
-      DAE_BUILDER_P,
-      DAE_BUILDER_D,
-      DAE_BUILDER_U,
-      DAE_BUILDER_X,
-      DAE_BUILDER_S,
-      DAE_BUILDER_SDOT,
-      DAE_BUILDER_Z,
-      DAE_BUILDER_Q,
-      DAE_BUILDER_W,
-      DAE_BUILDER_Y,
-      DAE_BUILDER_NUM_IN
-    };
-
-    // Output convension in codegen
-    enum DaeBuilderOut {
-      DAE_BUILDER_DDEF,
-      DAE_BUILDER_WDEF,
-      DAE_BUILDER_ODE,
-      DAE_BUILDER_DAE,
-      DAE_BUILDER_ALG,
-      DAE_BUILDER_QUAD,
-      DAE_BUILDER_YDEF,
-      DAE_BUILDER_NUM_OUT
-    };
-
-    // Get string representation for input, given enum
-    static std::string name_in(DaeBuilderIn ind);
-
-    // Get string representation for all inputs
-    static std::string name_in();
-
-    // Get enum representation for input, given string
-    static DaeBuilderIn enum_in(const std::string& id);
-
-    // Get enum representation for input, given vector of strings
-    static std::vector<DaeBuilderIn> enum_in(const std::vector<std::string>& id);
-
-    // Get string representation for output, given enum
-    static std::string name_out(DaeBuilderOut ind);
-
-    // Get string representation for all outputs
-    static std::string name_out();
-
-    // Get enum representation for output, given string
-    static DaeBuilderOut enum_out(const std::string& id);
-
-    // Get enum representation for output, given vector of strings
-    static std::vector<DaeBuilderOut> enum_out(const std::vector<std::string>& id);
-
-    // Get input expression, given enum
-    std::vector<MX> input(DaeBuilderIn ind) const;
-
-    // Get output expression, given enum
-    std::vector<MX> output(DaeBuilderOut ind) const;
-
-    // Get input expression, given enum
-    std::vector<MX> input(std::vector<DaeBuilderIn>& ind) const;
-
-    // Get output expression, given enum
-    std::vector<MX> output(std::vector<DaeBuilderOut>& ind) const;
-
-    // Get multiplier corresponding to an output expression, given enum
-    std::vector<MX> multiplier(DaeBuilderOut ind) const;
-#endif // SWIG
-
-    /// Add a named linear combination of output expressions
-    MX add_lc(const std::string& name,
-              const std::vector<std::string>& f_out);
-
-    /// Construct a function object
-    Function create(const std::string& fname,
-                    const std::vector<std::string>& s_in,
-                    const std::vector<std::string>& s_out) const;
-    ///@}
-
-    /// Get variable expression by name
-    MX var(const std::string& name) const;
-
-    /// Get variable expression by name
-    MX operator()(const std::string& name) const {return var(name);}
-
-    /// Get a derivative expression by name
-    MX der(const std::string& name) const;
-
-    /// Get a derivative expression by non-differentiated expression
-    MX der(const MX& var) const;
-
-    /// Get the nominal value by name
-    double nominal(const std::string& name) const;
-
-    /// Get the nominal value(s) by expression
-    std::vector<double> nominal(const MX& var) const;
-
-    /// Set the nominal value by name
-    void set_nominal(const std::string& name, double val);
-
-    /// Set the nominal value(s) by expression
-    void set_nominal(const MX& var, const std::vector<double>& val);
-
-    /// Get the lower bound by name
-    double min(const std::string& name, bool normalized=false) const;
-
-    /// Get the lower bound(s) by expression
-    std::vector<double> min(const MX& var, bool normalized=false) const;
-
-    /// Set the lower bound by name
-    void set_min(const std::string& name, double val, bool normalized=false);
-
-    /// Set the lower bound(s) by expression
-    void set_min(const MX& var, const std::vector<double>& val, bool normalized=false);
-
-    /// Get the upper bound by name
-    double max(const std::string& name, bool normalized=false) const;
-
-    /// Get the upper bound(s) by expression
-    std::vector<double> max(const MX& var, bool normalized=false) const;
-
-    /// Set the upper bound by name
-    void set_max(const std::string& name, double val, bool normalized=false);
-
-    /// Set the upper bound(s) by expression
-    void set_max(const MX& var, const std::vector<double>& val, bool normalized=false);
-
-    /// Get the initial guess by name
-    double guess(const std::string& name, bool normalized=false) const;
-
-    /// Get the initial guess(es) by expression
-    std::vector<double> guess(const MX& var, bool normalized=false) const;
-
-    /// Set the initial guess by name
-    void set_guess(const std::string& name, double val, bool normalized=false);
-
-    /// Set the initial guess(es) by expression
-    void set_guess(const MX& var, const std::vector<double>& val, bool normalized=false);
-
-    /// Get the (optionally normalized) value at time 0 by name
-    double start(const std::string& name, bool normalized=false) const;
-
-    /// Get the (optionally normalized) value(s) at time 0 by expression
-    std::vector<double> start(const MX& var, bool normalized=false) const;
-
-    /// Set the (optionally normalized) value at time 0 by name
-    void set_start(const std::string& name, double val, bool normalized=false);
-
-    /// Set the (optionally normalized) value(s) at time 0 by expression
-    void set_start(const MX& var, const std::vector<double>& val, bool normalized=false);
-
-    /// Get the (optionally normalized) derivative value at time 0 by name
-    double derivative_start(const std::string& name, bool normalized=false) const;
-
-    /// Get the (optionally normalized) derivative value(s) at time 0 by expression
-    std::vector<double> derivative_start(const MX& var, bool normalized=false) const;
-
-    /// Set the (optionally normalized) derivative value at time 0 by name
-    void set_derivative_start(const std::string& name, double val, bool normalized=false);
-
-    /// Set the (optionally normalized) derivative value(s) at time 0 by expression
-    void set_derivative_start(const MX& var, const std::vector<double>& val, bool normalized=false);
-
-    /// Get the unit for a component
-    std::string unit(const std::string& name) const;
-
-    /// Get the unit given a vector of symbolic variables (all units must be identical)
-    std::string unit(const MX& var) const;
-
-    /// Set the unit for a component
-    void set_unit(const std::string& name, const std::string& val);
-
-    /// Readable name of the class
-    std::string type_name() const {return "DaeBuilder";}
-
-    ///  Print representation
-    void disp(std::ostream& stream, bool more=false) const;
-
-    /// Get string representation
-    std::string get_str(bool more=false) const {
-      std::stringstream ss;
-      disp(ss, more);
-      return ss.str();
-    }
-
-    /// Add a variable
-    void add_variable(const std::string& name, const Variable& var);
-
-    /// Add a new variable: returns corresponding symbolic expression
-    MX add_variable(const std::string& name, casadi_int n=1);
-
-    /// Add a new variable: returns corresponding symbolic expression
-    MX add_variable(const std::string& name, const Sparsity& sp);
-
-    ///@{
-    /// Access a variable by name
-    Variable& variable(const std::string& name);
-    const Variable& variable(const std::string& name) const;
-    ///@}
-
-#ifndef SWIG
-    // Internal methods
-  protected:
-
-    /// Get the qualified name
-    static std::string qualified_name(const XmlNode& nn);
-
-    /// Find of variable by name
-    typedef std::map<std::string, Variable> VarMap;
-    VarMap varmap_;
-
-    /// Linear combinations of output expressions
-    std::map<std::string, MX> lin_comb_;
-
-    /** \brief Functions */
-    std::vector<Function> fun_;
-
-    /// Read an equation
-    MX read_expr(const XmlNode& node);
-
-    /// Read a variable
-    Variable& read_variable(const XmlNode& node);
-
-    /// Get an attribute by expression
-    typedef double (DaeBuilder::*getAtt)(const std::string& name, bool normalized) const;
-    std::vector<double> attribute(getAtt f, const MX& var, bool normalized) const;
-
-    /// Get a symbolic attribute by expression
-    typedef MX (DaeBuilder::*getAttS)(const std::string& name) const;
-    MX attribute(getAttS f, const MX& var) const;
-
-    /// Set an attribute by expression
-    typedef void (DaeBuilder::*setAtt)(const std::string& name, double val, bool normalized);
-    void set_attribute(setAtt f, const MX& var, const std::vector<double>& val, bool normalized);
-
-    /// Set a symbolic attribute by expression
-    typedef void (DaeBuilder::*setAttS)(const std::string& name, const MX& val);
-    void set_attribute(setAttS f, const MX& var, const MX& val);
+#ifdef WITH_DEPRECATED_FEATURES
+  /// [DEPRECATED] Use add
+  Variable& new_variable(const std::string& name, casadi_int numel = 1);
+
+  ///@{
+  /// [DEPRECATED] Access to internal class and corresponding indexing removed
+  Variable& variable(const std::string& name);
+  const Variable& variable(const std::string& name) const;
+  Variable& variable(size_t ind);
+  const Variable& variable(size_t ind) const;
+  size_t find(const std::string& name) const;
+  std::vector<size_t> find(const std::vector<std::string>& name) const;
+  const std::string& name(size_t ind) const;
+  std::vector<std::string> name(const std::vector<size_t>& ind) const;
+  ///@}
+
+  ///@{
+  /// [DEPRECATED] Use string name, not internal index to access variables
+  const MX& var(size_t ind) const;
+  std::vector<MX> var(const std::vector<size_t>& ind) const;
+  ///@}
+
+#endif // WITH_DEPRECATED_FEATURES
+
+  /// Access a member function or object
+  const DaeBuilderInternal* operator->() const;
+
+  /// Access a member function or object
+  DaeBuilderInternal* operator->();
+
+  /// Check if a particular cast is allowed
+  static bool test_cast(const SharedObjectInternal* ptr);
 
 #endif // SWIG
-
-  };
+};
 
 } // namespace casadi
 

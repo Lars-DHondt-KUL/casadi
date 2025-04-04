@@ -26,47 +26,13 @@
 #include "function_internal.hpp"
 #include "global_options.hpp"
 #include "serializing_stream.hpp"
+#include "casadi_os.hpp"
+#include <casadi/config.h>
+#include <casadi/core/casadi_common.hpp>
 
 #include <stdlib.h>
 
 /// \cond INTERNAL
-
-// For dynamic loading
-#ifdef WITH_DL
-#ifdef _WIN32 // also for 64-bit
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0502
-#endif
-#include <windows.h>
-#else // _WIN32
-#include <dlfcn.h>
-#endif // _WIN32
-
-// Set default shared library prefix
-#ifndef SHARED_LIBRARY_PREFIX
-#define SHARED_LIBRARY_PREFIX "lib"
-#endif // SHARED_LIBRARY_PREFIX
-
-// Set default shared library suffix
-#ifndef SHARED_LIBRARY_SUFFIX
-#define SHARED_LIBRARY_SUFFIX ".so"
-#endif // SHARED_LIBRARY_SUFFIX
-
-#ifdef _WIN32
-    #define DL_HANDLE_TYPE HINSTANCE
-#else // _WIN32
-    #define DL_HANDLE_TYPE void *
-#endif
-
-// http://stackoverflow.com/questions/303562/c-format-macro-inline-ostringstream
-#define STRING(ITEMS) \
-  ((dynamic_cast<std::ostringstream &>(std::ostringstream() \
-    . seekp(0, std::ios_base::cur) << ITEMS)) . str())
-
-#endif // WITH_DL
 
 namespace casadi {
   // Avoid segmentation faults when exposed function not implemented
@@ -79,9 +45,11 @@ namespace casadi {
   typedef ProtoFunction* (*Deserialize)(DeserializingStream&);
 
   /** \brief Interface for accessing input and output data structures
+
       \author Joel Andersson
       \date 2013
-  */
+
+      \identifier{rp} */
   template<class Derived>
   class PluginInterface {
     public:
@@ -117,17 +85,18 @@ namespace casadi {
     static Plugin pluginFromRegFcn(RegFcn regfcn);
 
     /// Load a plugin dynamically
-    static Plugin load_plugin(const std::string& pname, bool register_plugin=true);
+    static Plugin load_plugin(const std::string& pname,
+      bool register_plugin=true, bool needs_lock=true);
 
     /// Load a library dynamically
-    static DL_HANDLE_TYPE load_library(const std::string& libname, std::string& resultpath,
+    static handle_t load_library(const std::string& libname, std::string& resultpath,
       bool global);
 
     /// Register an integrator in the factory
-    static void registerPlugin(const Plugin& plugin);
+    static void registerPlugin(const Plugin& plugin, bool needs_lock=true);
 
     /// Register an integrator in the factory
-    static void registerPlugin(RegFcn regfcn);
+    static void registerPlugin(RegFcn regfcn, bool needs_lock=true);
 
     /// Load and get the creator function
     static Plugin& getPlugin(const std::string& pname);
@@ -139,12 +108,16 @@ namespace casadi {
     // Get name of the plugin
     virtual const char* plugin_name() const = 0;
 
-    /** \brief Serialize type information */
+    /** \brief Serialize type information
+
+        \identifier{rq} */
     void serialize_type(SerializingStream& s) const {
       s.pack("PluginInterface::plugin_name", std::string(plugin_name()));
     }
 
-    /** \brief Deserialize with type disambiguation */
+    /** \brief Deserialize with type disambiguation
+
+        \identifier{rr} */
     static ProtoFunction* deserialize(DeserializingStream& s) {
       std::string class_name, plugin_name;
       s.unpack("PluginInterface::plugin_name", plugin_name);
@@ -157,6 +130,10 @@ namespace casadi {
   template<class Derived>
   bool PluginInterface<Derived>::has_plugin(const std::string& pname, bool verbose) {
 
+#ifdef CASADI_WITH_THREADSAFE_SYMBOLICS
+    std::lock_guard<std::mutex> lock(Derived::mutex_solvers_);
+#endif // CASADI_WITH_THREADSAFE_SYMBOLICS
+
     // Quick return if available
     if (Derived::solvers_.find(pname) != Derived::solvers_.end()) {
       return true;
@@ -164,7 +141,7 @@ namespace casadi {
 
     // Try loading the plugin
     try {
-      (void)load_plugin(pname, false);
+      (void)load_plugin(pname, false, false);
       return true;
     } catch (CasadiException& ex) {
       if (verbose) {
@@ -196,14 +173,14 @@ namespace casadi {
 
     // Set the fields
     int flag = regfcn(&plugin);
-    casadi_assert_dev(flag==0);
+    casadi_assert(flag==0, "Registration of plugin failed.");
 
     return plugin;
   }
 
 
   template<class Derived>
-  DL_HANDLE_TYPE PluginInterface<Derived>::load_library(const std::string& libname,
+  handle_t PluginInterface<Derived>::load_library(const std::string& libname,
     std::string& resultpath, bool global) {
 
 #ifndef WITH_DL
@@ -214,127 +191,33 @@ namespace casadi {
     std::string lib = SHARED_LIBRARY_PREFIX + libname + SHARED_LIBRARY_SUFFIX;
 
     // Build up search paths;
-    std::vector<std::string> search_paths;
-
-    #ifdef _WIN32
-    char pathsep = ';';
-    const std::string filesep("\\");
-    #else
-    char pathsep = ':';
-    const std::string filesep("/");
-    #endif
-
-    // Search path: global casadipath option
-    std::stringstream casadipaths(GlobalOptions::getCasadiPath());
-    std::string casadipath;
-    while (std::getline(casadipaths, casadipath, pathsep)) {
-      search_paths.push_back(casadipath);
-    }
-
-    // Search path: CASADIPATH env variable
-    char* pLIBDIR;
-    pLIBDIR = getenv("CASADIPATH");
-
-    if (pLIBDIR!=nullptr) {
-      std::stringstream casadipaths(pLIBDIR);
-      std::string casadipath;
-      while (std::getline(casadipaths, casadipath, pathsep)) {
-        search_paths.push_back(casadipath);
-      }
-    }
-
-    // Search path: bare
-    search_paths.push_back("");
-
-    // Search path : PLUGIN_EXTRA_SEARCH_PATH
-    #ifdef PLUGIN_EXTRA_SEARCH_PATH
-    search_paths.push_back(
-      std::string("") + PLUGIN_EXTRA_SEARCH_PATH);
-    #endif // PLUGIN_EXTRA_SEARCH_PATH
-
-    // Search path : current directory
-    search_paths.push_back(".");
-
-    // Prepare error string
-    std::stringstream errors;
-    errors << "PluginInterface::load_plugin: Cannot load shared library '"
-           << lib << "': " << std::endl;
-    errors << "   (\n"
-           << "    Searched directories: 1. casadipath from GlobalOptions\n"
-           << "                          2. CASADIPATH env var\n"
-           << "                          3. PATH env var (Windows)\n"
-           << "                          4. LD_LIBRARY_PATH env var (Linux)\n"
-           << "                          5. DYLD_LIBRARY_PATH env var (osx)\n"
-           << "    A library may be 'not found' even if the file exists:\n"
-           << "          * library is not compatible (different compiler/bitness)\n"
-           << "          * the dependencies are not found\n"
-           << "   )";
-
-    // Alocate a handle pointer
-#ifdef _WIN32
-    HINSTANCE handle = 0;
-#else // _WIN32
-    void * handle = nullptr;
-#endif
-
-    // Alocate a handle pointer
-#ifndef _WIN32
-    int flag;
-    if (global) {
-      flag = RTLD_NOW | RTLD_GLOBAL;
-    } else {
-      flag = RTLD_LAZY | RTLD_LOCAL;
-    }
-#ifdef WITH_DEEPBIND
-#ifndef __APPLE__
-    flag |= RTLD_DEEPBIND;
-#endif
-#endif
-#endif
-
-    std::string searchpath;
-
-    // Try getting a handle
-    for (casadi_int i=0;i<search_paths.size();++i) {
-      searchpath = search_paths[i];
-#ifdef _WIN32
-      SetDllDirectory(TEXT(searchpath.c_str()));
-      handle = LoadLibrary(TEXT(lib.c_str()));
-      SetDllDirectory(NULL);
-#else // _WIN32
-      std::string libname = searchpath.empty() ? lib : searchpath + filesep + lib;
-      handle = dlopen(libname.c_str(), flag);
-#endif // _WIN32
-      if (handle) {
-        break;
-      } else {
-        errors << std::endl << "  Tried '" << searchpath << "' :";
-#ifdef _WIN32
-        errors << std::endl << "    Error code (WIN32): " << STRING(GetLastError());
-#else // _WIN32
-        errors << std::endl << "    Error code: " << dlerror();
-#endif // _WIN32
-      }
-    }
-
-    resultpath = searchpath;
-
-    casadi_assert(handle!=nullptr, errors.str());
-
-    return handle;
+    std::vector<std::string> search_paths = get_search_paths();
+    return open_shared_library(lib, search_paths, resultpath,
+      "PluginInterface::load_plugin", global);
 
 #endif // WITH_DL
   }
 
   template<class Derived>
   typename PluginInterface<Derived>::Plugin
-      PluginInterface<Derived>::load_plugin(const std::string& pname, bool register_plugin) {
+      PluginInterface<Derived>::load_plugin(const std::string& pname,
+        bool register_plugin, bool needs_lock) {
+
+#ifdef CASADI_WITH_THREADSAFE_SYMBOLICS
+    casadi::conditional_lock_guard<std::mutex> lock(Derived::mutex_solvers_, needs_lock);
+#endif // CASADI_WITH_THREADSAFE_SYMBOLICS
+
     // Issue warning and quick return if already loaded
     if (Derived::solvers_.find(pname) != Derived::solvers_.end()) {
       casadi_warning("PluginInterface: Solver " + pname + " is already in use. Ignored.");
       return Plugin();
     }
 
+    // Logger singletons are lazily instantiated on first uout()/uerr() calls
+    // This instantation may lead to a data race with potential instatiations in plugin
+    // To be safe, trigger instantatin before any plugin loading
+    uout();
+    uerr();
 
 #ifndef WITH_DL
     casadi_error("WITH_DL option needed for dynamic loading");
@@ -346,17 +229,26 @@ namespace casadi {
     std::string regName = "casadi_register_" + Derived::infix_ + "_" + pname;
 
     std::string searchpath;
-    DL_HANDLE_TYPE handle = load_library("casadi_" + Derived::infix_ + "_" + pname, searchpath,
+    handle_t handle = load_library("casadi_" + Derived::infix_ + "_" + pname, searchpath,
       false);
 
 #ifdef _WIN32
-    reg = (RegFcn)GetProcAddress(handle, TEXT(regName.c_str()));
+
+#if __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
+    reg = reinterpret_cast<RegFcn>(GetProcAddress(handle, TEXT(regName.c_str())));
+#if __GNUC__
+#pragma GCC diagnostic pop
+#endif
+
 #else // _WIN32
     // Reset error
     dlerror();
 
     // Load creator
-    reg = (RegFcn)dlsym(handle, regName.c_str());
+    reg = reinterpret_cast<RegFcn>(dlsym(handle, regName.c_str()));
 #endif // _WIN32
     casadi_assert(reg!=nullptr,
       "PluginInterface::load_plugin: no \"" + regName + "\" found in " + searchpath + ".");
@@ -365,7 +257,7 @@ namespace casadi {
     Plugin plugin = pluginFromRegFcn(reg);
     // Register the plugin
     if (register_plugin) {
-      registerPlugin(plugin);
+      registerPlugin(plugin, false);
     }
 
     return plugin;
@@ -374,12 +266,16 @@ namespace casadi {
   }
 
   template<class Derived>
-  void PluginInterface<Derived>::registerPlugin(RegFcn regfcn) {
-    registerPlugin(pluginFromRegFcn(regfcn));
+  void PluginInterface<Derived>::registerPlugin(RegFcn regfcn, bool needs_lock) {
+    registerPlugin(pluginFromRegFcn(regfcn), needs_lock);
   }
 
   template<class Derived>
-  void PluginInterface<Derived>::registerPlugin(const Plugin& plugin) {
+  void PluginInterface<Derived>::registerPlugin(const Plugin& plugin, bool needs_lock) {
+
+#ifdef CASADI_WITH_THREADSAFE_SYMBOLICS
+    casadi::conditional_lock_guard<std::mutex> lock(Derived::mutex_solvers_, needs_lock);
+#endif // CASADI_WITH_THREADSAFE_SYMBOLICS
 
     // Check if the solver name is in use
     typename std::map<std::string, Plugin>::iterator it=Derived::solvers_.find(plugin.name);
@@ -394,12 +290,16 @@ namespace casadi {
   typename PluginInterface<Derived>::Plugin&
   PluginInterface<Derived>::getPlugin(const std::string& pname) {
 
+#ifdef CASADI_WITH_THREADSAFE_SYMBOLICS
+    std::lock_guard<std::mutex> lock(Derived::mutex_solvers_);
+#endif // CASADI_WITH_THREADSAFE_SYMBOLICS
+
     // Check if the solver has been loaded
     auto it=Derived::solvers_.find(pname);
 
     // Load the solver if needed
     if (it==Derived::solvers_.end()) {
-      load_plugin(pname);
+      load_plugin(pname, true, false);
       it=Derived::solvers_.find(pname);
     }
     casadi_assert_dev(it!=Derived::solvers_.end());

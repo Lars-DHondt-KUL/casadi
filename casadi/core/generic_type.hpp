@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -37,7 +37,9 @@ namespace casadi {
   class DeserializingStream;
 #if !(defined(SWIG) && !defined(SWIGXML))
 
-  /** \brief  Types of options */
+  /** \brief  Types of options
+
+      \identifier{17m} */
   enum TypeID {
     OT_NULL,
     OT_BOOL,
@@ -54,13 +56,19 @@ namespace casadi {
     OT_FUNCTION,
     OT_FUNCTIONVECTOR,
     OT_VOIDPTR,
-    OT_UNKNOWN};
+    OT_UNKNOWN,
+    OT_STRINGVECTORVECTOR,
+    OT_DICTVECTOR,
+    OT_VECTORVECTOR,
+    OT_VECTOR};
 #endif // SWIG
 
-  /** \brief Generic data type, can hold different types such as bool, casadi_int, string etc.
+  /** \brief Generic data type, can hold different types such as bool, casadi_int, std::string etc.
+
       \author Joel Andersson
       \date 2010
-  */
+
+      \identifier{17n} */
   class CASADI_EXPORT GenericType
     : public SWIG_IF_ELSE(PrintableCommon, Printable<GenericType>)
 #if !(defined(SWIG) && !defined(SWIGXML))
@@ -89,10 +97,14 @@ namespace casadi {
     GenericType(const std::vector<double>& dv);
     GenericType(const std::vector< std::vector<double> >& dv);
     GenericType(const std::vector<std::string>& sv);
+    GenericType(const std::vector<std::vector<std::string> >& sv);
     GenericType(const char s[]);
     GenericType(const Function& f);
     GenericType(const std::vector<Function>& f);
     GenericType(const Dict& dict);
+    GenericType(const std::vector<Dict>& dictv);
+    GenericType(const std::vector<std::vector<GenericType> >& gvv);
+    GenericType(const std::vector<GenericType>& gv);
     GenericType(void* ptr);
 
     /// Public class name
@@ -105,7 +117,9 @@ namespace casadi {
 
     /// \cond INTERNAL
 #ifndef SWIG
-    /** \brief  Create from node */
+    /** \brief  Create from node
+
+        \identifier{17o} */
     static GenericType create(SharedObjectInternal* node);
 #endif // SWIG
     /// \endcond
@@ -134,9 +148,13 @@ namespace casadi {
       return to_double_vector_vector();
     }
     operator std::vector<std::string>() const { return to_string_vector();}
+    operator std::vector<std::vector<std::string> >() const { return to_string_vector_vector();}
     operator const Function&() const { return as_function();}
     operator const std::vector<Function>&() const { return as_function_vector();}
     operator const Dict&() const { return as_dict();}
+    operator const std::vector<Dict>&() const { return as_dict_vector();}
+    operator const std::vector<std::vector<GenericType> >&() const { return as_vector_vector();}
+    operator const std::vector<GenericType>&() const { return as_vector();}
     ///@}
 
     bool can_cast_to(TypeID other) const;
@@ -149,7 +167,9 @@ namespace casadi {
 #endif
 
     ///@{
-    /** \brief Check if a particular type */
+    /** \brief Check if a particular type
+
+        \identifier{17p} */
     bool is_bool() const;
     bool is_int() const;
     bool is_double() const;
@@ -161,14 +181,20 @@ namespace casadi {
     bool is_double_vector_vector() const;
     bool is_bool_vector() const;
     bool is_string_vector() const;
+    bool is_string_vector_vector() const;
     bool is_dict() const;
+    bool is_dict_vector() const;
+    bool is_vector_vector() const;
+    bool is_vector() const;
     bool is_function() const;
     bool is_function_vector() const;
     bool is_void_pointer() const;
     ///@}
 
     ///@{
-    /** \brief Cast to the internal type */
+    /** \brief Cast to the internal type
+
+        \identifier{17q} */
     const bool& as_bool() const;
     const casadi_int& as_int() const;
     const double& as_double() const;
@@ -179,7 +205,11 @@ namespace casadi {
     const std::vector<double>& as_double_vector() const;
     const std::vector< std::vector<double> >& as_double_vector_vector() const;
     const std::vector<std::string>& as_string_vector() const;
+    const std::vector<std::vector<std::string> >& as_string_vector_vector() const;
     const Dict& as_dict() const;
+    const std::vector<Dict>& as_dict_vector() const;
+    const std::vector<std::vector< GenericType> >& as_vector_vector() const;
+    const std::vector<GenericType>& as_vector() const;
     const Function& as_function() const;
     const std::vector<Function>& as_function_vector() const;
     void* const & as_void_pointer() const;
@@ -197,7 +227,11 @@ namespace casadi {
     std::vector<double> to_double_vector() const;
     std::vector< std::vector<double> > to_double_vector_vector() const;
     std::vector<std::string> to_string_vector() const;
+    std::vector<std::vector<std::string> > to_string_vector_vector() const;
     Dict to_dict() const;
+    std::vector<Dict> to_dict_vector() const;
+    std::vector<GenericType> to_vector() const;
+    std::vector< std::vector< GenericType> > to_vector_vector() const;
     Function to_function() const;
     std::vector<Function> to_function_vector() const;
     void* to_void_pointer() const;
@@ -209,10 +243,14 @@ namespace casadi {
     bool operator!=(const GenericType& op2) const;
 #endif // SWIG
 
-    /** \brief Serialize an object */
+    /** \brief Serialize an object
+
+        \identifier{17r} */
     void serialize(SerializingStream& s) const;
 
-    /** \brief Deserialize with type disambiguation */
+    /** \brief Deserialize with type disambiguation
+
+        \identifier{17s} */
     static GenericType deserialize(DeserializingStream& s);
   };
 
@@ -220,6 +258,14 @@ namespace casadi {
   typedef GenericType::Dict Dict;
 
 #ifndef SWIG
+  template<class T>
+  T get_from_dict(const std::map<std::string, T>& d,
+      const std::string& key, const T& default_value) {
+    auto it = d.find(key);
+    if (it==d.end()) return default_value;
+    return it->second;
+  }
+
   template<class T>
   T get_from_dict(const Dict& d, const std::string& key, const T& default_value) {
     auto it = d.find(key);
@@ -249,12 +295,17 @@ namespace casadi {
 
   /** \brief Combine two dicts. First has priority 
    * 
-   * 
-   */
+   *
+      \identifier{17t} */
   CASADI_EXPORT Dict combine(const Dict& first, const Dict& second, bool recurse=false);
 
-  /** \brief Update the target dictorionary in place with source elements */
+  /** \brief Update the target dictionary in place with source elements
+
+      \identifier{17u} */
   CASADI_EXPORT void update_dict(Dict& target, const Dict& source, bool recurse=false);
+
+  CASADI_EXPORT void update_dict(Dict& target, const std::string& key,
+    const GenericType& value, bool recurse=false);
 #endif
 
 } // namespace casadi

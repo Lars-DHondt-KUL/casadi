@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -27,8 +27,6 @@
 #include "casadi_misc.hpp"
 #include <sstream>
 #include <vector>
-
-using namespace std;
 
 namespace casadi {
 
@@ -86,15 +84,17 @@ namespace casadi {
 
   int Project::sp_reverse(bvec_t** arg, bvec_t** res, casadi_int* iw, bvec_t* w) const {
     dep().sparsity().bor(arg[0], res[0], sparsity());
-    fill(res[0], res[0]+nnz(), 0);
+    std::fill(res[0], res[0]+nnz(), 0);
     return 0;
   }
 
   void Project::generate(CodeGenerator& g,
                           const std::vector<casadi_int>& arg,
-                          const std::vector<casadi_int>& res) const {
-    g << g.project(g.work(arg.front(), dep().nnz()), dep(0).sparsity(),
-                           g.work(res.front(), nnz()), sparsity(), "w") << "\n";
+                          const std::vector<casadi_int>& res,
+                          const std::vector<bool>& arg_is_ref,
+                          std::vector<bool>& res_is_ref) const {
+    g << g.project(g.work(arg.front(), dep().nnz(), arg_is_ref.front()), dep(0).sparsity(),
+                           g.work(res.front(), nnz(), false), sparsity(), "w") << "\n";
   }
 
   void Project::serialize_type(SerializingStream& s) const {
@@ -129,16 +129,20 @@ namespace casadi {
 
   void Densify::generate(CodeGenerator& g,
                           const std::vector<casadi_int>& arg,
-                          const std::vector<casadi_int>& res) const {
-    g << g.densify(g.work(arg.front(), dep().nnz()), dep(0).sparsity(),
-                           g.work(res.front(), nnz())) << "\n";
+                          const std::vector<casadi_int>& res,
+                          const std::vector<bool>& arg_is_ref,
+                          std::vector<bool>& res_is_ref) const {
+    g << g.densify(g.work(arg.front(), dep().nnz(), arg_is_ref.front()), dep(0).sparsity(),
+                           g.work(res.front(), nnz(), false)) << "\n";
   }
 
   void Sparsify::generate(CodeGenerator& g,
                           const std::vector<casadi_int>& arg,
-                          const std::vector<casadi_int>& res) const {
-    g << g.sparsify(g.work(arg.front(), dep().nnz()),
-                           g.work(res.front(), nnz()), sparsity()) << "\n";
+                          const std::vector<casadi_int>& res,
+                          const std::vector<bool>& arg_is_ref,
+                          std::vector<bool>& res_is_ref) const {
+    g << g.sparsify(g.work(arg.front(), dep().nnz(), arg_is_ref.front()),
+                           g.work(res.front(), nnz(), false), sparsity()) << "\n";
   }
 
   template<typename T>

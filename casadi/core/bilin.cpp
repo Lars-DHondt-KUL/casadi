@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -25,7 +25,6 @@
 
 #include "bilin.hpp"
 
-using namespace std;
 namespace casadi {
 
   Bilin::Bilin(const MX& A, const MX& x, const MX& y) {
@@ -122,11 +121,13 @@ namespace casadi {
 
   void Bilin::generate(CodeGenerator& g,
                        const std::vector<casadi_int>& arg,
-                       const std::vector<casadi_int>& res) const {
+                       const std::vector<casadi_int>& res,
+                       const std::vector<bool>& arg_is_ref,
+                       std::vector<bool>& res_is_ref) const {
     g << g.workel(res[0]) << " = "
-      << g.bilin(g.work(arg[0], dep(0).nnz()), dep(0).sparsity(),
-                 g.work(arg[1], dep(1).nnz()),
-                 g.work(arg[2], dep(2).nnz())) << ";\n";
+      << g.bilin(g.work(arg[0], dep(0).nnz(), arg_is_ref[0]), dep(0).sparsity(),
+                 g.work(arg[1], dep(1).nnz(), arg_is_ref[1]),
+                 g.work(arg[2], dep(2).nnz(), arg_is_ref[2])) << ";\n";
   }
 
 } // namespace casadi

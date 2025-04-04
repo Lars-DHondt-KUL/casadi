@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -28,8 +28,6 @@
 #include <algorithm>
 #include "casadi_misc.hpp"
 #include "serializing_stream.hpp"
-
-using namespace std;
 
 namespace casadi {
 
@@ -58,18 +56,48 @@ namespace casadi {
     }
   }
 
-  void ConstantMX::split_primitives(const MX& x, std::vector<MX>::iterator& it) const {
+  template<typename T>
+  void ConstantMX::split_primitives_gen(const T& x, typename std::vector<T>::iterator& it) const {
     if (nnz()!=0) {
       MXNode::split_primitives(x, it);
     }
   }
 
-  MX ConstantMX::join_primitives(std::vector<MX>::const_iterator& it) const {
+  void ConstantMX::split_primitives(const MX& x, std::vector<MX>::iterator& it) const {
+    split_primitives_gen<MX>(x, it);
+  }
+
+  void ConstantMX::split_primitives(const SX& x, std::vector<SX>::iterator& it) const {
+    split_primitives_gen<SX>(x, it);
+  }
+
+  void ConstantMX::split_primitives(const DM& x, std::vector<DM>::iterator& it) const {
+    split_primitives_gen<DM>(x, it);
+  }
+
+  template<typename T>
+  T ConstantMX::join_primitives_gen(typename std::vector<T>::const_iterator& it) const {
     if (nnz()==0) {
-      return MX(sparsity());
+      return T(sparsity());
     } else {
       return MXNode::join_primitives(it);
     }
+  }
+
+  MX ConstantMX::join_primitives(std::vector<MX>::const_iterator& it) const {
+    if (nnz()==0) {
+      return shared_from_this<MX>();
+    } else {
+      return MXNode::join_primitives(it);
+    }
+  }
+
+  SX ConstantMX::join_primitives(std::vector<SX>::const_iterator& it) const {
+    return join_primitives_gen<SX>(it);
+  }
+
+  DM ConstantMX::join_primitives(std::vector<DM>::const_iterator& it) const {
+    return join_primitives_gen<DM>(it);
   }
 
   void ConstantMX::eval_mx(const std::vector<MX>& arg, std::vector<MX>& res) const {
@@ -89,23 +117,30 @@ namespace casadi {
   }
 
   int ConstantMX::sp_forward(const bvec_t** arg, bvec_t** res, casadi_int* iw, bvec_t* w) const {
-    fill_n(res[0], nnz(), 0);
+    std::fill_n(res[0], nnz(), 0);
     return 0;
   }
 
   int ConstantMX::sp_reverse(bvec_t** arg, bvec_t** res, casadi_int* iw, bvec_t* w) const {
-    fill_n(res[0], nnz(), 0);
+    std::fill_n(res[0], nnz(), 0);
     return 0;
   }
 
   void ConstantDM::generate(CodeGenerator& g,
                             const std::vector<casadi_int>& arg,
-                            const std::vector<casadi_int>& res) const {
+                            const std::vector<casadi_int>& res,
+                            const std::vector<bool>& arg_is_ref,
+                            std::vector<bool>& res_is_ref) const {
     // Print the constant
-    string ind = g.constant(x_.nonzeros());
+    std::string ind = g.constant(x_.nonzeros());
 
-    // Copy the constant to the work vector
-    g << g.copy(ind, nnz(), g.work(res[0], nnz())) << '\n';
+    if (g.elide_copy(nnz())) {
+      g << g.work(res[0], nnz(), true) << " = " << ind << ";\n";
+      res_is_ref[0] = true;
+    } else {
+      // Copy the constant to the work vector
+      g << g.copy(ind, nnz(), g.work(res[0], nnz(), false)) << '\n';
+    }
   }
 
   bool ConstantMX::__nonzero__() const {
@@ -147,7 +182,7 @@ namespace casadi {
       return create(val.sparsity(), val.scalar());
     } else {
       // Check if all values are the same
-      const vector<double> vdata = val.nonzeros();
+      const std::vector<double> vdata = val.nonzeros();
       double v = vdata[0];
       for (auto&& i : vdata) {
         if (i!=v) {
@@ -167,6 +202,10 @@ namespace casadi {
     } else {
       return new ConstantFile(sp, fname);
     }
+  }
+
+  ConstantMX* ConstantMX::create(const DM& x, const std::string& name) {
+    return new ConstantPool(x, name);
   }
 
   bool ConstantDM::is_zero() const {
@@ -287,6 +326,7 @@ namespace casadi {
     switch (t) {
       case 'a':    return new ConstantDM(s);
       case 'f':    return new ConstantFile(s);
+      case 'p':    return new ConstantPool(s);
       case 'z':    return ZeroByZero::getInstance();
       case 'D':
         return new Constant<RuntimeConst<double> >(s, RuntimeConst<double>::deserialize(s));
@@ -351,8 +391,69 @@ namespace casadi {
 
   void ConstantFile::generate(CodeGenerator& g,
                             const std::vector<casadi_int>& arg,
-                            const std::vector<casadi_int>& res) const {
-    g << g.copy(g.rom_double(this), nnz(), g.work(res[0], nnz())) << '\n';
+                            const std::vector<casadi_int>& res,
+                            const std::vector<bool>& arg_is_ref,
+                            std::vector<bool>& res_is_ref) const {
+    if (nnz()==1) {
+      g << g.workel(res[0]) << " = " << g.rom_double(this) << "[0];\n";
+    } else if (g.elide_copy(nnz())) {
+      g << g.work(res[0], nnz(), true) << " = " << g.rom_double(this) << ";\n";
+      res_is_ref[0] = true;
+    } else {
+      g << g.copy(g.rom_double(this), nnz(), g.work(res[0], nnz(), false)) << '\n';
+    }
+  }
+
+  ConstantPool::ConstantPool(const DM& x, const std::string& name) :
+      ConstantMX(x.sparsity()), name_(name), x_(x.nonzeros()) {
+  }
+
+  std::string ConstantPool::disp(const std::vector<std::string>& arg) const {
+    return "constant_pool('"  + name_ + "'): " + DM(sparsity(), x_, false).get_str();
+  }
+
+  double ConstantPool::to_double() const {
+    casadi_error("Not defined for ConstantPool");
+  }
+
+  Matrix<double> ConstantPool::get_DM() const {
+    casadi_error("Not defined for ConstantPool");
+  }
+
+  void ConstantPool::generate(CodeGenerator& g,
+                            const std::vector<casadi_int>& arg,
+                            const std::vector<casadi_int>& res,
+                            const std::vector<bool>& arg_is_ref,
+                            std::vector<bool>& res_is_ref) const {
+    if (nnz()==1) {
+      g << g.workel(res[0]) << " = " << g.pool_double(name_) << "[0];\n";
+    } else if (g.elide_copy(nnz())) {
+      g << g.work(res[0], nnz(), true) << " = " << g.pool_double(name_) << ";\n";
+      res_is_ref[0] = true;
+    } else {
+      g << g.copy(g.pool_double(name_), nnz(), g.work(res[0], nnz(), false)) << '\n';
+    }
+  }
+
+  void ConstantPool::add_dependency(CodeGenerator& g) const {
+    g.define_pool_double(name_, x_);
+    g.add_include("string.h");
+  }
+
+  void ConstantPool::serialize_body(SerializingStream& s) const {
+    MXNode::serialize_body(s);
+    s.pack("ConstantPool::name", name_);
+    s.pack("ConstantPool::x", x_);
+  }
+
+  void ConstantPool::serialize_type(SerializingStream& s) const {
+    MXNode::serialize_type(s);
+    s.pack("ConstantPool::type", 'p');
+  }
+
+  ConstantPool::ConstantPool(DeserializingStream& s) : ConstantMX(s) {
+    s.unpack("ConstantPool::name", name_);
+    s.unpack("ConstantPool::x", x_);
   }
 
 } // namespace casadi

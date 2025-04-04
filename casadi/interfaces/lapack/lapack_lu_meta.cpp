@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -28,18 +28,23 @@
 
       const std::string casadi::LapackLu::meta_doc=
       "\n"
-"This class solves the linear system A.x=b by making an LU factorization of A: A = L.U, with L lower and U upper triangular\n"
+"\n"
+"\n"
+"This class solves the linear system  A.x=b by making an LU factorization of A:  A = L.U, with L lower and U upper triangular\n"
+"\n"
+"Extra doc: https://github.com/casadi/casadi/wiki/L_22h \n"
 "\n"
 "\n"
 ">List of available options\n"
 "\n"
-"+-----------------------------+------------+---------+-------------+\n"
-"|             Id              |    Type    | Default | Description |\n"
-"+=============================+============+=========+=============+\n"
-"| allow_equilibration_failure | OT_BOOL | false   |             |\n"
-"+-----------------------------+------------+---------+-------------+\n"
-"| equilibration               | OT_BOOL | true    |             |\n"
-"+-----------------------------+------------+---------+-------------+\n"
+"+-----------------------------+---------+----------------------------------+\n"
+"|             Id              |  Type   |           Description            |\n"
+"+=============================+=========+==================================+\n"
+"| allow_equilibration_failure | OT_BOOL | Non-fatal error when             |\n"
+"|                             |         | equilibration fails              |\n"
+"+-----------------------------+---------+----------------------------------+\n"
+"| equilibration               | OT_BOOL | Equilibrate the matrix           |\n"
+"+-----------------------------+---------+----------------------------------+\n"
 "\n"
 "\n"
 "\n"

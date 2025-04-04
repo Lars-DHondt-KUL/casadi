@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -30,8 +30,6 @@
 #include <sstream>
 #include <vector>
 
-using namespace std;
-
 namespace casadi {
 
   UnaryMX::UnaryMX(Operation op, MX x) : op_(op) {
@@ -49,7 +47,7 @@ namespace casadi {
   }
 
   int UnaryMX::eval(const double** arg, double** res, casadi_int* iw, double* w) const {
-    double dummy = numeric_limits<double>::quiet_NaN();
+    double dummy = std::numeric_limits<double>::quiet_NaN();
     casadi_math<double>::fun(op_, arg[0], dummy, res[0], nnz());
     return 0;
   }
@@ -63,6 +61,12 @@ namespace casadi {
   void UnaryMX::eval_mx(const std::vector<MX>& arg, std::vector<MX>& res) const {
     MX dummy;
     casadi_math<MX>::fun(op_, arg[0], dummy, res[0]);
+  }
+
+  void UnaryMX::eval_linear(const std::vector<std::array<MX, 3> >& arg,
+                        std::vector<std::array<MX, 3> >& res) const {
+    MX dummy[3];
+    casadi_math<MX>::fun_linear(op_, arg[0].data(), dummy, res[0].data());
   }
 
   void UnaryMX::ad_forward(const std::vector<std::vector<MX> >& fseed,
@@ -103,8 +107,10 @@ namespace casadi {
 
   void UnaryMX::generate(CodeGenerator& g,
                           const std::vector<casadi_int>& arg,
-                          const std::vector<casadi_int>& res) const {
-    string r, x;
+                          const std::vector<casadi_int>& res,
+                          const std::vector<bool>& arg_is_ref,
+                          std::vector<bool>& res_is_ref) const {
+    std::string r, x;
     if (nnz()==1) {
       // Scalar assignment
       r = g.workel(res[0]);
@@ -114,7 +120,8 @@ namespace casadi {
       g.local("cs", "const casadi_real", "*");
       g.local("rr", "casadi_real", "*");
       g.local("i", "casadi_int");
-      g << "for (i=0, rr=" << g.work(res[0], nnz()) << ", cs=" << g.work(arg[0], nnz())
+      g << "for (i=0, rr=" << g.work(res[0], nnz(), false) << ", cs="
+        << g.work(arg[0], nnz(), arg_is_ref[0])
         << "; i<" << sparsity().nnz() << "; ++i) ";
       r = "*rr++";
       x = "*cs++";

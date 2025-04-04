@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -29,6 +29,8 @@
 #include <set>
 #include <sstream>
 #include <unordered_map>
+#include <cstdint>
+#include <climits>
 
 namespace casadi {
   class Slice;
@@ -39,9 +41,12 @@ namespace casadi {
   class SXElem;
   class GenericType;
   class Importer;
+  class Resource;
+  class Fmu;
   class SharedObject;
   class SharedObjectInternal;
   class SXNode;
+  class SerializingStream;
   class UniversalNodeOwner {
   public:
     UniversalNodeOwner() = delete;
@@ -60,21 +65,27 @@ namespace casadi {
   typedef std::map<std::string, GenericType> Dict;
 
   /** \brief Helper class for Serialization
+
       \author Joris Gillis
       \date 2018
-  */
+
+      \identifier{ak} */
   class CASADI_EXPORT DeserializingStream {
+    friend class SerializingStream;
   public:
     /// Constructor
     DeserializingStream(std::istream &in_s);
     DeserializingStream(const DeserializingStream&) = delete;
+
+    void setup();
 
     //@{
     /** \brief Reconstruct an object from the input stream
     *
     * If the reference is not of the same type as the object encoded in the stream.
     * an error will be raised.
-    */
+
+        \identifier{al} */
     void unpack(Sparsity& e);
     void unpack(MX& e);
     void unpack(SXElem& e);
@@ -85,10 +96,16 @@ namespace casadi {
     }
     void unpack(Function& e);
     void unpack(Importer& e);
+    void unpack(Resource& e);
+    void unpack(Fmu& e);
     void unpack(GenericType& e);
     void unpack(std::ostream& s);
     void unpack(Slice& e);
     void unpack(int& e);
+
+#if SIZE_MAX != UINT_MAX || defined(__EMSCRIPTEN__)
+    void unpack(unsigned int& e);
+#endif
     void unpack(bool& e);
     void unpack(casadi_int& e);
     void unpack(size_t& e);
@@ -141,12 +158,16 @@ namespace casadi {
     int version(const std::string& name);
     int version(const std::string& name, int min, int max);
 
+    void connect(SerializingStream & s);
+    void reset();
+
   private:
 
-    /* \brief Unpacks a shared object
-    * 
+    /** \brief Unpacks a shared object
+    *
     * Also treats SXNode, which is not actually a SharedObjectInternal
-    */
+
+        \identifier{am} */
     template <class T, class M>
     void shared_unpack(T& e) {
       char i;
@@ -154,13 +175,14 @@ namespace casadi {
       switch (i) {
         case 'd': // definition
           e = T::deserialize(*this);
-          nodes.emplace_back(e.get());
+          if (shared_map_) (*shared_map_)[e.get()] = nodes_.size();
+          nodes_.emplace_back(e.get());
           break;
         case 'r': // reference
           {
             casadi_int k;
             unpack("Shared::reference", k);
-            UniversalNodeOwner& t = nodes.at(k);
+            UniversalNodeOwner& t = nodes_.at(k);
             e = T::create(static_cast<M*>(t.get()));
           }
           break;
@@ -172,15 +194,19 @@ namespace casadi {
     /** \brief Primitive typecheck during deserialization
      *
      * No-op unless in debug mode
-     */
+
+        \identifier{an} */
     void assert_decoration(char e);
 
     /// Collection of all shared pointer deserialized so far
-    std::vector<UniversalNodeOwner> nodes;
+    std::vector<UniversalNodeOwner> nodes_;
+    std::unordered_map<void*, casadi_int>* shared_map_ = nullptr;
     /// Input stream
     std::istream& in;
     /// Debug mode?
     bool debug_;
+    /// Did setup ran?
+    bool set_up_ = false;
   };
 
   /** \brief Helper class for Serialization
@@ -188,15 +214,19 @@ namespace casadi {
 
       \author Joris Gillis
       \date 2018
-  */
+
+      \identifier{ao} */
   class CASADI_EXPORT SerializingStream {
+    friend class DeserializingStream;
   public:
     /// Constructor
     SerializingStream(std::ostream& out);
     SerializingStream(std::ostream& out, const Dict& opts);
 
     // @{
-    /** \brief Serializes an object to the output stream  */
+    /** \brief Serializes an object to the output stream
+
+        \identifier{ap} */
     void pack(const Sparsity& e);
     void pack(const MX& e);
     void pack(const SXElem& e);
@@ -207,10 +237,15 @@ namespace casadi {
     }
     void pack(const Function& e);
     void pack(const Importer& e);
+    void pack(const Resource& e);
+    void pack(const Fmu& e);
     void pack(const Slice& e);
     void pack(const GenericType& e);
     void pack(std::istream& s);
     void pack(int e);
+#if SIZE_MAX != UINT_MAX || defined(__EMSCRIPTEN__)
+    void pack(unsigned int e);
+#endif
     void pack(bool e);
     void pack(casadi_int e);
     void pack(size_t e);
@@ -221,7 +256,7 @@ namespace casadi {
     void pack(const std::vector<T>& e) {
       decorate('V');
       pack(static_cast<casadi_int>(e.size()));
-      for (const T & i : e) pack(i);
+      for (auto&& i : e) pack(i);
     }
     template <class K, class V>
     void pack(const std::map<K, V>& e) {
@@ -251,17 +286,23 @@ namespace casadi {
     //@}
 
     void version(const std::string& name, int v);
+
+    void connect(DeserializingStream & s);
+    void reset();
+
   private:
     /** \brief Insert information for a primitive typecheck during deserialization
      *
      * No-op unless in debug mode
-     */
+
+        \identifier{aq} */
     void decorate(char e);
 
-    /* \brief Packs a shared object
-    * 
+    /** \brief Packs a shared object
+    *
     * Also treats SXNode, which is not actually a SharedObjectInternal
-    */
+
+        \identifier{ar} */
     template <class T>
     void shared_pack(const T& e) {
       auto it = shared_map_.find(e.get());
@@ -271,6 +312,7 @@ namespace casadi {
         e.serialize(*this);
         casadi_int r = shared_map_.size();
         shared_map_[e.get()] = r;
+        if (nodes_) nodes_->emplace_back(e.get());
       } else {
         pack("Shared::flag", 'r'); // reference
         pack("Shared::reference", it->second);
@@ -279,6 +321,7 @@ namespace casadi {
 
     /// Mapping from shared pointers to running counter
     std::unordered_map<void*, casadi_int> shared_map_;
+    std::vector<UniversalNodeOwner>* nodes_ = nullptr;
     /// Output stream
     std::ostream& out;
     /// Debug mode?

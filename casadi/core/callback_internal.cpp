@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -23,8 +23,6 @@
  */
 
 #include "callback_internal.hpp"
-
-using namespace std;
 
 namespace casadi {
 
@@ -74,6 +72,15 @@ namespace casadi {
     TRY_CALL(has_eval_buffer, self_);
   }
 
+  bool CallbackInternal::has_jac_sparsity(casadi_int oind, casadi_int iind) const {
+    TRY_CALL(has_jac_sparsity, self_, oind, iind);
+  }
+
+  Sparsity CallbackInternal::get_jac_sparsity(casadi_int oind, casadi_int iind,
+      bool symmetric) const {
+    TRY_CALL(get_jac_sparsity, self_, oind, iind, symmetric);
+  }
+
   void CallbackInternal::init(const Dict& opts) {
     // Initialize the base classes
     FunctionInternal::init(opts);
@@ -112,6 +119,7 @@ namespace casadi {
   /** \brief  Evaluate numerically */
   int CallbackInternal::eval(const double** arg, double** res,
       casadi_int* iw, double* w, void* mem) const {
+    setup(mem, arg, res, iw, w);
     if (has_eval_dm()) {
       return FunctionInternal::eval(arg, res, iw, w, mem);
     } else {

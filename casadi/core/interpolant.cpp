@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -29,18 +29,17 @@
 #include "casadi_low.hpp"
 #include <typeinfo>
 
-using namespace std;
 namespace casadi {
 
-  bool has_interpolant(const string& name) {
+  bool has_interpolant(const std::string& name) {
     return Interpolant::has_plugin(name);
   }
 
-  void load_interpolant(const string& name) {
+  void load_interpolant(const std::string& name) {
     Interpolant::load_plugin(name);
   }
 
-  string doc_interpolant(const string& name) {
+  std::string doc_interpolant(const std::string& name) {
     return Interpolant::getPlugin(name).doc;
   }
 
@@ -130,9 +129,9 @@ namespace casadi {
                        const Dict& opts) {
       Interpolant::check_grid(grid);
       // Get offset for each input dimension
-      vector<casadi_int> offset;
+      std::vector<casadi_int> offset;
       // Stack input grids
-      vector<double> stacked;
+      std::vector<double> stacked;
 
        // Consistency check, number of elements
       casadi_uint nel=1;
@@ -195,9 +194,9 @@ namespace casadi {
       Interpolant::check_grid(grid);
 
       // Get offset for each input dimension
-      vector<casadi_int> offset;
+      std::vector<casadi_int> offset;
       // Stack input grids
-      vector<double> stacked;
+      std::vector<double> stacked;
 
       Interpolant::stack_grid(grid, offset, stacked);
       return Interpolant::construct(solver, name, stacked, offset, std::vector<double>{}, m, opts);
@@ -253,13 +252,17 @@ namespace casadi {
 
   std::map<std::string, Interpolant::Plugin> Interpolant::solvers_;
 
+#ifdef CASADI_WITH_THREADSAFE_SYMBOLICS
+  std::mutex Interpolant::mutex_solvers_;
+#endif // CASADI_WITH_THREADSAFE_SYMBOLICS
+
   const std::string Interpolant::infix_ = "interpolant";
 
   const Options Interpolant::options_
   = {{&FunctionInternal::options_},
      {{"lookup_mode",
        {OT_STRINGVECTOR,
-        "Specifies, for each grid dimenion, the lookup algorithm used to find the correct index. "
+        "Specifies, for each grid dimension, the lookup algorithm used to find the correct index. "
         "'linear' uses a for-loop + break; (default when #knots<=100), "
         "'exact' uses floored division (only for uniform grids), "
         "'binary' uses a binary search. (default when #knots>100)."}},

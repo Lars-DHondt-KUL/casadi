@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -48,5 +48,11 @@ namespace casadi {
   const char* CasadiMeta::plugins() { return CASADI_PLUGINS;}
 
   const char* CasadiMeta::install_prefix() { return CASADI_INSTALL_PREFIX;}
+
+  const char* CasadiMeta::shared_library_prefix() { return CASADI_SHARED_LIBRARY_PREFIX;}
+
+  const char* CasadiMeta::shared_library_suffix() { return CASADI_SHARED_LIBRARY_SUFFIX;}
+
+  const char* CasadiMeta::object_file_suffix() { return CASADI_OBJECT_FILE_SUFFIX;}
 
 }  // namespace casadi

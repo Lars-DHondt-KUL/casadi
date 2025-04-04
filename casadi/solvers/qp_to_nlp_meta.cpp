@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -28,24 +28,23 @@
 
       const std::string casadi::QpToNlp::meta_doc=
       "\n"
-"Solve QPs using an Nlpsol\n"
+"\n"
+"\n"
+"Solve QPs using an Nlpsol Use the 'nlpsol' option to specify the NLP \n"
+"solver to use.\n"
+"\n"
+"Extra doc: https://github.com/casadi/casadi/wiki/L_235 \n"
 "\n"
 "\n"
 ">List of available options\n"
 "\n"
-"+----+------+---------+-------------+\n"
-"| Id | Type | Default | Description |\n"
-"+====+======+=========+=============+\n"
-"+----+------+---------+-------------+\n"
-"\n"
-"\n"
-">List of available stats\n"
-"\n"
-"+------------------+\n"
-"|        Id        |\n"
-"+==================+\n"
-"| nlpsol_stats |\n"
-"+------------------+\n"
+"+----------------+-----------+---------------------------------+\n"
+"|       Id       |   Type    |           Description           |\n"
+"+================+===========+=================================+\n"
+"| nlpsol         | OT_STRING | Name of solver.                 |\n"
+"+----------------+-----------+---------------------------------+\n"
+"| nlpsol_options | OT_DICT   | Options to be passed to solver. |\n"
+"+----------------+-----------+---------------------------------+\n"
 "\n"
 "\n"
 "\n"

@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -33,8 +33,6 @@
 #include <sstream>
 #include <vector>
 
-using namespace std;
-
 namespace casadi {
 
   template<bool ScX, bool ScY>
@@ -62,6 +60,12 @@ namespace casadi {
   }
 
   template<bool ScX, bool ScY>
+  void BinaryMX<ScX, ScY>::eval_linear(const std::vector<std::array<MX, 3> >& arg,
+                        std::vector<std::array<MX, 3> >& res) const {
+    casadi_math<MX>::fun_linear(op_, arg[0].data(), arg[1].data(), res[0].data());
+  }
+
+  template<bool ScX, bool ScY>
   void BinaryMX<ScX, ScY>::ad_forward(const std::vector<std::vector<MX> >& fseed,
                                    std::vector<std::vector<MX> >& fsens) const {
     // Get partial derivatives
@@ -70,7 +74,11 @@ namespace casadi {
 
     // Propagate forward seeds
     for (casadi_int d=0; d<fsens.size(); ++d) {
-      fsens[d][0] = pd[0]*fseed[d][0] + pd[1]*fseed[d][1];
+      if (op_ == OP_IF_ELSE_ZERO) {
+        fsens[d][0] = if_else_zero(pd[1], fseed[d][1]);
+      } else {
+        fsens[d][0] = pd[0]*fseed[d][0] + pd[1]*fseed[d][1];
+      }
     }
   }
 
@@ -84,18 +92,28 @@ namespace casadi {
     // Propagate adjoint seeds
     for (casadi_int d=0; d<aseed.size(); ++d) {
       MX s = aseed[d][0];
-      for (casadi_int c=0; c<2; ++c) {
-        // Get increment of sensitivity c
-        MX t = pd[c]*s;
-
-        // If dimension mismatch (i.e. one argument is scalar), then sum all the entries
-        if (!t.is_scalar() && t.size() != dep(c).size()) {
-          if (pd[c].size()!=s.size()) pd[c] = MX(s.sparsity(), pd[c]);
-          t = dot(pd[c], s);
+      if (op_ == OP_IF_ELSE_ZERO) {
+        // Special case to avoid NaN propagation
+        if (!s.is_scalar() && dep(1).is_scalar()) {
+          asens[d][1] += dot(dep(0), s);
+        } else {
+          asens[d][1] += if_else_zero(dep(0), s);
         }
+      } else {
+        // General case
+        for (casadi_int c=0; c<2; ++c) {
+          // Get increment of sensitivity c
+          MX t = pd[c]*s;
 
-        // Propagate the seeds
-        asens[d][c] += t;
+          // If dimension mismatch (i.e. one argument is scalar), then sum all the entries
+          if (!t.is_scalar() && t.size() != dep(c).size()) {
+            if (pd[c].size()!=s.size()) pd[c] = MX(s.sparsity(), pd[c]);
+            t = dot(pd[c], s);
+          }
+
+          // Propagate the seeds
+          asens[d][c] += t;
+        }
       }
     }
   }
@@ -103,7 +121,8 @@ namespace casadi {
   template<bool ScX, bool ScY>
   void BinaryMX<ScX, ScY>::
   generate(CodeGenerator& g,
-           const std::vector<casadi_int>& arg, const std::vector<casadi_int>& res) const {
+           const std::vector<casadi_int>& arg, const std::vector<casadi_int>& res,
+           const std::vector<bool>& arg_is_ref, std::vector<bool>& res_is_ref) const {
     // Quick return if nothing to do
     if (nnz()==0) return;
 
@@ -114,7 +133,7 @@ namespace casadi {
     case OP_SUB:
     case OP_MUL:
     case OP_DIV:
-      inplace = res[0]==arg[0];
+      inplace = res[0]==arg[0] && !arg_is_ref[0];
       break;
     default:
       inplace = false;
@@ -122,22 +141,27 @@ namespace casadi {
     }
 
     // Scalar names of arguments (start assuming all scalars)
-    string r = g.workel(res[0]);
-    string x = g.workel(arg[0]);
-    string y = g.workel(arg[1]);
+    std::string r = g.workel(res[0]);
+    std::string x = g.workel(arg[0]);
+    std::string y = g.workel(arg[1]);
+
+    // Avoid emitting '/*' which will be mistaken for a comment
+    if (op_==OP_DIV && g.codegen_scalars && dep(1).nnz()==1) {
+      y = "(" + y + ")";
+    }
 
     // Codegen loop, if needed
     if (nnz()>1) {
       // Iterate over result
       g.local("rr", "casadi_real", "*");
       g.local("i", "casadi_int");
-      g << "for (i=0, " << "rr=" << g.work(res[0], nnz());
+      g << "for (i=0, " << "rr=" << g.work(res[0], nnz(), false);
       r = "(*rr++)";
 
       // Iterate over first argument?
       if (!ScX && !inplace) {
         g.local("cr", "const casadi_real", "*");
-        g << ", cr=" << g.work(arg[0], dep(0).nnz());
+        g << ", cr=" << g.work(arg[0], dep(0).nnz(), arg_is_ref[0]);
         if (op_==OP_OR || op_==OP_AND) {
           // Avoid short-circuiting with side effects
           x = "cr[i]";
@@ -150,8 +174,8 @@ namespace casadi {
       // Iterate over second argument?
       if (!ScY) {
         g.local("cs", "const casadi_real", "*");
-        g << ", cs=" << g.work(arg[1], dep(1).nnz());
-        if (op_==OP_OR || op_==OP_AND) {
+        g << ", cs=" << g.work(arg[1], dep(1).nnz(), arg_is_ref[1]);
+        if (op_==OP_OR || op_==OP_AND || op_==OP_IF_ELSE_ZERO) {
           // Avoid short-circuiting with side effects
           y = "cs[i]";
         } else {
@@ -309,6 +333,38 @@ namespace casadi {
     int op;
     s.unpack("BinaryMX::op", op);
     op_ = Operation(op);
+  }
+
+  template<bool ScX, bool ScY>
+  MX BinaryMX<ScX, ScY>::get_solve_triu(const MX& r, bool tr) const {
+    // Identify systems with the structure (I - R)
+    if (!ScX && !ScY && op_ == OP_SUB) {
+      // Is the first term a projected unity matrix?
+      if (dep(0).is_op(OP_PROJECT) && dep(0).dep(0).is_eye()) {
+        // Is the second term strictly lower triangular?
+        if (dep(1).is_op(OP_PROJECT) && dep(1).dep(0).sparsity().is_triu(true)) {
+          return dep(1).dep(0)->get_solve_triu_unity(r, tr);
+        }
+      }
+    }
+    // Fall back to default routine
+    return MXNode::get_solve_triu(r, tr);
+  }
+
+  template<bool ScX, bool ScY>
+  MX BinaryMX<ScX, ScY>::get_solve_tril(const MX& r, bool tr) const {
+    // Identify systems with the structure (I - L)
+    if (!ScX && !ScY && op_ == OP_SUB) {
+      // Is the first term a projected unity matrix?
+      if (dep(0).is_op(OP_PROJECT) && dep(0).dep(0).is_eye()) {
+        // Is the second term strictly lower triangular?
+        if (dep(1).is_op(OP_PROJECT) && dep(1).dep(0).sparsity().is_tril(true)) {
+          return dep(1).dep(0)->get_solve_tril_unity(r, tr);
+        }
+      }
+    }
+    // Fall back to default routine
+    return MXNode::get_solve_tril(r, tr);
   }
 
 } // namespace casadi

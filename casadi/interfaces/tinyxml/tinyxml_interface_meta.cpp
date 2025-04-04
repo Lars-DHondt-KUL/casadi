@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -28,17 +28,11 @@
 
       const std::string casadi::TinyXmlInterface::meta_doc=
       "\n"
+"\n"
+"\n"
 "XmlFile using TinyXml\n"
 "\n"
-"\n"
-">List of available options\n"
-"\n"
-"+----+------+---------+-------------+\n"
-"| Id | Type | Default | Description |\n"
-"+====+======+=========+=============+\n"
-"+----+------+---------+-------------+\n"
-"\n"
-"\n"
+"Extra doc: https://github.com/casadi/casadi/wiki/L_22i \n"
 "\n"
 "\n"
 ;

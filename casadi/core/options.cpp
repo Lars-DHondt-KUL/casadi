@@ -2,8 +2,8 @@
  *    This file is part of CasADi.
  *
  *    CasADi -- A symbolic framework for dynamic optimization.
- *    Copyright (C) 2010-2014 Joel Andersson, Joris Gillis, Moritz Diehl,
- *                            K.U. Leuven. All rights reserved.
+ *    Copyright (C) 2010-2023 Joel Andersson, Joris Gillis, Moritz Diehl,
+ *                            KU Leuven. All rights reserved.
  *    Copyright (C) 2011-2014 Greg Horn
  *
  *    CasADi is free software; you can redistribute it and/or
@@ -26,8 +26,6 @@
 #include "options.hpp"
 #include <algorithm>
 #include <locale>
-
-using namespace std;
 
 namespace casadi {
 
@@ -76,8 +74,8 @@ namespace casadi {
     if (na == 0) return static_cast<double>(nb);
     if (nb == 0) return static_cast<double>(na);
 
-    vector<casadi_int> v0(nb+1, 0);
-    vector<casadi_int> v1(nb+1, 0);
+    std::vector<casadi_int> v0(nb+1, 0);
+    std::vector<casadi_int> v1(nb+1, 0);
 
     for (casadi_int i=0;i<nb+1;++i)
       v0[i] = i;
@@ -94,7 +92,7 @@ namespace casadi {
         if (s != t)
           cost = 1;
 
-        v1[j+1] = min(min(v1[j] + 1, v0[j+1] + 1), v0[j] + cost);
+        v1[j+1] = std::min(std::min(v1[j] + 1, v0[j+1] + 1), v0[j] + cost);
       }
 
       for (casadi_int j=0; j<nb+1; j++)
@@ -104,10 +102,10 @@ namespace casadi {
     return static_cast<double>(v1[nb]);
   }
 
-  vector<string> Options::suggestions(const string& word, casadi_int amount) const {
+  std::vector<std::string> Options::suggestions(const std::string& word, casadi_int amount) const {
     // Best distances so far
-    const double inf = numeric_limits<double>::infinity();
-    vector<pair<double, string> > best(amount, {inf, ""});
+    const double inf = std::numeric_limits<double>::infinity();
+    std::vector<std::pair<double, std::string>> best(amount, {inf, ""});
 
     // Iterate over elements
     best_matches(word, best);
@@ -116,7 +114,7 @@ namespace casadi {
     stable_sort(best.begin(), best.end());
 
     // Collect the values that are non-infinite
-    vector<string> ret;
+    std::vector<std::string> ret;
     ret.reserve(amount);
     for (auto&& e : best) {
       if (e.first!=inf) {
@@ -127,7 +125,7 @@ namespace casadi {
   }
 
   void Options::best_matches(const std::string& word,
-                             vector<pair<double, string> >& best) const {
+                             std::vector<std::pair<double, std::string> >& best) const {
     // Iterate over bases
     for (auto&& b : bases) {
       b->best_matches(word, best);
@@ -152,9 +150,11 @@ namespace casadi {
 
   bool Options::has_dot(const Dict& opts) {
     for (auto&& op : opts) {
-      if (op.first.find('.') != string::npos || op.first.find("__") != string::npos) {
+      if (op.first.find('.') != std::string::npos || op.first.find("__") != std::string::npos) {
         return true;
       }
+      // Call recursively
+      if (op.second.is_dict() && has_dot(op.second)) return true;
     }
     return false;
   }
@@ -170,15 +170,15 @@ namespace casadi {
     return !has_dot(opts) && !has_null(opts);
   }
 
-  Dict Options::sanitize(const Dict& opts) {
+  Dict Options::sanitize(const Dict& opts, bool top_level) {
     // Drop nulls
-    if (has_null(opts)) {
+    if (top_level && has_null(opts)) {
       // Create a new dictionary without the null entries
       Dict ret;
       for (auto&& op : opts) {
         if (!op.second.is_null()) ret[op.first] = op.second;
       }
-      return ret;
+      return sanitize(ret, false);
     }
 
     //  Treat the case where any of the options have a dot (dictionary shorthand)
@@ -193,33 +193,42 @@ namespace casadi {
       // Process options
       for (auto&& op : opts) {
         // Find the dot if any
-        string::size_type dotpos = op.first.find('.'), dotpos_end;
-        if (dotpos==string::npos) {
+        std::string::size_type dotpos = op.first.find('.'), dotpos_end;
+        if (dotpos==std::string::npos) {
           dotpos = op.first.find("__");
-          if (dotpos!=string::npos) dotpos_end = dotpos+2;
+          if (dotpos!=std::string::npos) dotpos_end = dotpos+2;
         } else {
           dotpos_end = dotpos+1;
         }
 
         // Flush last sub-dictionary
-        if (!sname.empty() && (dotpos==string::npos
+        if (!sname.empty() && (dotpos==std::string::npos
                                || op.first.compare(0, dotpos, sname)!=0)) {
-          ret[sname] = sopts;
+          update_dict(ret, sname, sanitize(sopts, false), true);
+
           sname.clear();
           sopts.clear();
         }
 
+        GenericType value = op.second;
+        if (value.is_dict()) {
+          value = sanitize(value, false);
+        }
+
         // Add to dictionary
-        if (dotpos != string::npos) {
+        if (dotpos != std::string::npos) {
           sname = op.first.substr(0, dotpos);
-          sopts[op.first.substr(dotpos_end)] = op.second;
+          std::string target_name = op.first.substr(dotpos_end);
+          sopts[target_name] = value;
         } else {
-          ret[op.first] = op.second;
+          update_dict(ret, op.first, value, true);
         }
       }
 
       // Flush trailing sub-dictionary
-      if (!sname.empty()) ret[sname] = sopts;
+      if (!sname.empty()) {
+        update_dict(ret, sname, sanitize(sopts, false), true);
+      }
 
       return ret;
     }
@@ -235,14 +244,14 @@ namespace casadi {
 
       // Informative error message if option does not exist
       if (entry==nullptr) {
-        stringstream ss;
-        ss << "Unknown option: " << op.first << endl;
-        ss << endl;
-        ss << "Did you mean one of the following?" << endl;
+        std::stringstream ss;
+        ss << "Unknown option: " << op.first << std::endl;
+        ss << std::endl;
+        ss << "Did you mean one of the following?" << std::endl;
         for (auto&& s : suggestions(op.first)) {
           print_one(s, ss);
         }
-        ss << "Use print_options() to get a full list of options." << endl;
+        ss << "Use print_options() to get a full list of options." << std::endl;
         casadi_error(ss.str());
       }
 
@@ -257,9 +266,9 @@ namespace casadi {
   }
 
   void Options::print_all(std::ostream &stream) const {
-    stream << "\"Option name\" [type] = value" << endl;
+    stream << "\"Option name\" [type] = value" << std::endl;
     disp(stream);
-    stream << endl;
+    stream << std::endl;
   }
 
   void Options::print_one(const std::string &name, std::ostream &stream) const {
