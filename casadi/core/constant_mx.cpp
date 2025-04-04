@@ -435,7 +435,7 @@ namespace casadi {
     }
   }
 
-  void ConstantPool::add_dependency(CodeGenerator& g) const {
+  void ConstantPool::add_dependency(CodeGenerator& g, const Instance& inst) const {
     g.define_pool_double(name_, x_);
     g.add_include("string.h");
   }

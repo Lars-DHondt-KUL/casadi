@@ -407,7 +407,7 @@ namespace casadi {
     /** \brief Add a dependent function
 
         \identifier{2a0} */
-    void add_dependency(CodeGenerator& g) const override;
+    void add_dependency(CodeGenerator& g, const Instance& inst) const override;
 
     /** \brief pool identifier
 
