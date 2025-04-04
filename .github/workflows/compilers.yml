@@ -1,6 +1,6 @@
 name: compilers
 
-on: [pull_request]
+on: [push, pull_request]
 
 env:
   cache-suffix: v11
