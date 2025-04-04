@@ -1158,8 +1158,8 @@ namespace casadi {
   std::string CodeGenerator::
   operator()(const Function& f, const std::string& arg,
              const std::string& res, const std::string& iw,
-             const std::string& w, const std::string& failure_ret,
-             const Instance& inst) {
+             const std::string& w, const Instance& inst,
+             const std::string& failure_ret) {
     std::string name = add_dependency(f, inst);
     bool needs_mem = !f->codegen_mem_type().empty();
     if (needs_mem) {
