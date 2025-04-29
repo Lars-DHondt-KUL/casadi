@@ -186,7 +186,7 @@ namespace casadi {
         // If argument is actually used
         if (k>=0) {
           // Make work vector element big enough
-          align[k] = max(align[k], e.data->align_in(c));
+          align[k] = std::max(align[k], e.data->align_in(c));
         }
       }
       // Loop over result locations of node
@@ -196,7 +196,7 @@ namespace casadi {
         // If result is actually used
         if (k>=0) {
           // Make work vector element big enough
-          align[k] = max(align[k], e.data->align_out(c));
+          align[k] = std::max(align[k], e.data->align_out(c));
         }
       }
     }
@@ -448,7 +448,7 @@ namespace casadi {
     for (auto&& e : algorithm_) align_w_extra = max(align_w_extra, e.data->align_w());
 
     // Exported alignment requirement is the composition of both
-    align_w_ = max(align_w_io, align_w_extra);
+    align_w_ = std::max(align_w_io, align_w_extra);
 
     // Allocate work vectors (numeric)
     workloc_.resize(worksize+1);
@@ -464,7 +464,7 @@ namespace casadi {
             alloc_arg(e.data->sz_arg());
             alloc_res(e.data->sz_res());
             alloc_iw(e.data->sz_iw());
-            sz_w_extra = max(sz_w_extra, e.data->sz_w());
+            sz_w_extra = std::max(sz_w_extra, e.data->sz_w());
 
             // First encounter?
             if (workloc_[e.res[c]] < 0) {
@@ -1392,28 +1392,6 @@ namespace casadi {
         g << "/* #" << k++ << ": " << print(e) << " */\n";
       }
 
-      for (casadi_int i=0; i<e.arg.size(); ++i) {
-        casadi_int j=e.arg.at(i);
-        if (j>=0) {
-          size_t a = e.data->align_in(i);
-          if (a>1) {
-            std::string rem = "(uintptr_t) " + g.work(j, e.data.dep(i).nnz())+"%"+str(a);
-            g << g.debug_assert(rem + "==0") + "\n";
-          }
-        }
-      }
-
-      for (casadi_int i=0; i<e.res.size(); ++i) {
-        casadi_int j=e.res.at(i);
-        if (j>=0) {
-          size_t a = e.data->align_out(i);
-          if (a>1) {
-            std::string rem = "(uintptr_t) " + g.work(j, e.data->sparsity(i).nnz())+"%"+str(a);
-            g << g.debug_assert(rem +"==0") + "\n";
-          }
-        }
-      }
-
       // Get the names of the operation arguments
       arg.resize(e.arg.size());
       arg_is_ref.resize(e.arg.size());
@@ -1442,6 +1420,30 @@ namespace casadi {
       res_is_ref.resize(e.res.size());
       // By default, don't assume references
       std::fill(res_is_ref.begin(), res_is_ref.end(), false);
+
+      // Alignment of arg
+      for (casadi_int i=0; i<e.arg.size(); ++i) {
+        casadi_int j=e.arg.at(i);
+        if (j>=0) {
+          size_t a = e.data->align_in(i);
+          if (a>1) {
+            std::string rem = "(uintptr_t) " + g.work(j, e.data.dep(i).nnz(), arg_is_ref.at(i))+"%"+str(a);
+            g << g.debug_assert(rem + "==0") + "\n";
+          }
+        }
+      }
+
+      // Alignment of res
+      for (casadi_int i=0; i<e.res.size(); ++i) {
+        casadi_int j=e.res.at(i);
+        if (j>=0) {
+          size_t a = e.data->align_out(i);
+          if (a>1) {
+            std::string rem = "(uintptr_t) " + g.work(j, e.data->sparsity(i).nnz(), res_is_ref.at(i))+"%"+str(a);
+            g << g.debug_assert(rem +"==0") + "\n";
+          }
+        }
+      }
 
       // Generate operation
       e.data->generate(g, arg, res, arg_is_ref, res_is_ref);
