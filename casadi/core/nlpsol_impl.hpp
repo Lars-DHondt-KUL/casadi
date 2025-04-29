@@ -226,7 +226,7 @@ namespace casadi {
     /** \brief Generate code for the function body
 
         \identifier{1o0} */
-    void codegen_body_enter(CodeGenerator& g, const Instance& inst) const override;
+    void codegen_body_enter(CodeGenerator& g) const override;
 
     /** \brief Generate code for the function body
 

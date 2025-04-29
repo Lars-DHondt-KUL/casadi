@@ -1176,7 +1176,7 @@ namespace casadi {
     return stats;
   }
 
-  void Nlpsol::codegen_body_enter(CodeGenerator& g, const Instance& inst) const {
+  void Nlpsol::codegen_body_enter(CodeGenerator& g) const {
     OracleFunction::codegen_body_enter(g);
     g.local("d_nlp", "struct casadi_nlpsol_data");
     g.local("p_nlp", "struct casadi_nlpsol_prob");
@@ -1247,7 +1247,7 @@ namespace casadi {
 
   }
 
-  void Nlpsol::codegen_declarations(CodeGenerator& g) const {
+  void Nlpsol::codegen_declarations(CodeGenerator& g, const Instance& inst) const {
     g.add_auxiliary(CodeGenerator::AUX_FILL);
     if (calc_f_ || calc_g_ || calc_lam_x_ || calc_lam_p_)
       g.add_dependency(get_function("nlp_grad"));
