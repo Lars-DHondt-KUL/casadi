@@ -470,7 +470,7 @@ namespace casadi {
 
     // Work vectors
     std::vector<casadi_int> iw(sz_iw());
-    std::vector<D> w(sz_w())+align_w()/sizeof(D));
+    std::vector<D> w(sz_w()+align_w()/sizeof(D));
 
     // Evaluate memoryless
     (*this)(get_ptr(arg), get_ptr(res), get_ptr(iw), casadi_align(get_ptr(w), align_w()), 0);

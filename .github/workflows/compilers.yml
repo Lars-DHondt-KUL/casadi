@@ -10,15 +10,13 @@ env:
 jobs:
   
 
-  windows-2022:
-    runs-on: windows-2022
+  windows-latest-mingw:v
+    runs-on: windows-latest
     strategy:
       fail-fast: false
-      matrix:
-        arch: [x64]
     steps:
       - uses: actions/checkout@v4.1.1
       - name : Build
         run: |
-            cmake -Bbuild -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -DWITH_SELFCONTAINED=ON -DWITH_FATROP=ON -DWITH_BUILD_FATROP=ON -DWITH_BUILD_REQUIRED=ON -DCMAKE_INSTALL_PREFIX=install
+            cmake -Bbuild -G "MinGW Makefiles" -DWITH_SELFCONTAINED=ON -DWITH_FATROP=ON -DWITH_BUILD_FATROP=ON -DWITH_BUILD_REQUIRED=ON -DCMAKE_INSTALL_PREFIX=install ${{env.build_flags}}
             cmake --build build --target install --config Release -v
