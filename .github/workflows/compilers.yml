@@ -10,7 +10,7 @@ env:
 jobs:
   
 
-  windows-latest-mingw:v
+  windows-latest-mingw:
     runs-on: windows-latest
     strategy:
       fail-fast: false
