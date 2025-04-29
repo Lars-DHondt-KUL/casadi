@@ -2882,7 +2882,7 @@ namespace casadi {
     alloc_res(sz_res*num_threads, persistent);
     alloc_iw(sz_iw*num_threads, persistent);
     alloc_w(sz_w*num_threads, persistent);
-    align_w_ = max(f.align_w(), align_w_);
+    align_w_ = std::max(f.align_w(), align_w_);
   }
 
   Dict ProtoFunction::get_stats(void* mem) const {
