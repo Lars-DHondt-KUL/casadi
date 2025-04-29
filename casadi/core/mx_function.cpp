@@ -445,7 +445,7 @@ namespace casadi {
     size_t align_w_io = align.empty() ? 1 : *std::max_element(align.begin(), align.end());
     // Max alignment extra working memory (e.g. Function calls)
     size_t align_w_extra = 1;
-    for (auto&& e : algorithm_) align_w_extra = max(align_w_extra, e.data->align_w());
+    for (auto&& e : algorithm_) align_w_extra = std::max(align_w_extra, e.data->align_w());
 
     // Exported alignment requirement is the composition of both
     align_w_ = std::max(align_w_io, align_w_extra);
