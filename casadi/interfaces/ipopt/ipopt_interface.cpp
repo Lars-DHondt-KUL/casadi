@@ -802,8 +802,8 @@ namespace casadi {
     g << "ipopt_free_mem(&" + codegen_mem(g) + ");\n";
   }
 
-void IpoptInterface::codegen_declarations(CodeGenerator& g) const {
-  Nlpsol::codegen_declarations(g);
+void IpoptInterface::codegen_declarations(CodeGenerator& g, const Instance& inst) const {
+  Nlpsol::codegen_declarations(g, inst);
   g.add_auxiliary(CodeGenerator::AUX_NLP);
   g.add_auxiliary(CodeGenerator::AUX_COPY);
   g.add_auxiliary(CodeGenerator::AUX_FMAX);
@@ -916,7 +916,7 @@ void IpoptInterface::codegen_declarations(CodeGenerator& g) const {
   }
 }
 
-void IpoptInterface::codegen_body(CodeGenerator& g) const {
+void IpoptInterface::codegen_body(CodeGenerator& g, const Instance& inst) const {
   codegen_body_enter(g);
   g.auxiliaries << g.sanitize_source(ipopt_runtime_str, {"casadi_real"});
 

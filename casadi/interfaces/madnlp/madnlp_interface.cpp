@@ -352,8 +352,8 @@ void MadnlpInterface::codegen_free_mem(CodeGenerator& g) const {
   g << "madnlp_free_mem(&" + codegen_mem(g) + ");\n";
 }
 
-void MadnlpInterface::codegen_declarations(CodeGenerator& g) const {
-  Nlpsol::codegen_declarations(g);
+void MadnlpInterface::codegen_declarations(CodeGenerator& g, const Instance& inst) const {
+  Nlpsol::codegen_declarations(g, inst);
   g.add_auxiliary(CodeGenerator::AUX_NLP);
   g.add_auxiliary(CodeGenerator::AUX_MAX);
   g.add_auxiliary(CodeGenerator::AUX_COPY);
@@ -372,7 +372,7 @@ void MadnlpInterface::codegen_declarations(CodeGenerator& g) const {
   g.add_include("MadnlpCInterface.h");
 }
 
-void MadnlpInterface::codegen_body(CodeGenerator& g) const {
+void MadnlpInterface::codegen_body(CodeGenerator& g, const Instance& inst) const {
   codegen_body_enter(g);
   g.auxiliaries << g.sanitize_source(madnlp_runtime_str, {"casadi_real"});
 

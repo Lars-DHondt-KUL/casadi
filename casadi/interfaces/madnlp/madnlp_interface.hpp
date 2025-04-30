@@ -129,10 +129,10 @@ class CASADI_NLPSOL_MADNLP_EXPORT MadnlpInterface : public Nlpsol {
   void set_madnlp_prob(CodeGenerator& g) const;
 
   /** \brief Generate code for the function body */
-  void codegen_body(CodeGenerator& g) const override;
+  void codegen_body(CodeGenerator& g, const Instance& inst) const override;
 
   /** \brief Generate code for the declarations of the C function */
-  void codegen_declarations(CodeGenerator& g) const override;
+  void codegen_declarations(CodeGenerator& g, const Instance& inst) const override;
 
   /** \brief Codegen alloc_mem */
   void codegen_init_mem(CodeGenerator& g) const override;
