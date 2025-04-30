@@ -1427,7 +1427,8 @@ namespace casadi {
         if (j>=0) {
           size_t a = e.data->align_in(i);
           if (a>1) {
-            std::string rem = "(uintptr_t) " + g.work(j, e.data.dep(i).nnz(), arg_is_ref.at(i))+"%"+str(a);
+            std::string rem = "(uintptr_t) " +
+            g.work(j, e.data.dep(i).nnz(), arg_is_ref.at(i))+"%"+str(a);
             g << g.debug_assert(rem + "==0") + "\n";
           }
         }
@@ -1439,7 +1440,8 @@ namespace casadi {
         if (j>=0) {
           size_t a = e.data->align_out(i);
           if (a>1) {
-            std::string rem = "(uintptr_t) " + g.work(j, e.data->sparsity(i).nnz(), res_is_ref.at(i))+"%"+str(a);
+            std::string rem = "(uintptr_t) " +
+            g.work(j, e.data->sparsity(i).nnz(), res_is_ref.at(i))+"%"+str(a);
             g << g.debug_assert(rem +"==0") + "\n";
           }
         }
