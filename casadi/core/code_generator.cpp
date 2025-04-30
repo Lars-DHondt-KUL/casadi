@@ -246,7 +246,7 @@ namespace casadi {
       return name + str(it->second);
     }
   }
-  string CodeGenerator::add_dependency(const Function& f, const Instance& inst) {
+  std::string CodeGenerator::add_dependency(const Function& f, const Instance& inst) {
 
     /*std::string prefix = "_";
     for (bool b : arg_null) prefix+= b ? 'n' : 'r';
@@ -1051,7 +1051,7 @@ namespace casadi {
     return s.str();
   }
 
-  string CodeGenerator::array(const string& type, const string& name, casadi_int len,
+  std::string CodeGenerator::array(const string& type, const string& name, casadi_int len,
     const string& def) {
   return array(type, name, str(len), def);
   }
