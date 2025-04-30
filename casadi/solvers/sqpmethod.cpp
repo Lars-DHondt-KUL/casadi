@@ -1021,7 +1021,7 @@ double Sqpmethod::calc_gamma_1(SqpmethodMemory* m) const {
 }
 
 void Sqpmethod::codegen_declarations(CodeGenerator& g, const Instance& inst) const {
-  Nlpsol::codegen_declarations(g, const Instance& inst);
+  Nlpsol::codegen_declarations(g, inst);
 
   if (max_iter_ls_ || so_corr_) g.add_dependency(get_function("nlp_fg"));
   g.add_dependency(get_function("nlp_jac_fg"));
@@ -1035,7 +1035,7 @@ void Sqpmethod::codegen_declarations(CodeGenerator& g, const Instance& inst) con
 
 void Sqpmethod::codegen_body(CodeGenerator& g, const Instance& inst) const {
   g.add_auxiliary(CodeGenerator::AUX_SQPMETHOD);
-  codegen_body_enter(g, const Instance& inst);
+  codegen_body_enter(g);
   // From nlpsol
 
   g.local("d", "struct casadi_sqpmethod_data*");
