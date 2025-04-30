@@ -1414,8 +1414,8 @@ int Feasiblesqpmethod::solve(void* mem) const {
     return 0;
   }
 
-void Feasiblesqpmethod::codegen_declarations(CodeGenerator& g) const {
-    Nlpsol::codegen_declarations(g);
+void Feasiblesqpmethod::codegen_declarations(CodeGenerator& g, const Instance& inst) const {
+    Nlpsol::codegen_declarations(g, inst);
     g.add_dependency(get_function("nlp_grad_f"));
     g.add_dependency(get_function("nlp_jac_g"));
     g.add_dependency(get_function("nlp_g"));
@@ -1424,7 +1424,7 @@ void Feasiblesqpmethod::codegen_declarations(CodeGenerator& g) const {
     g.add_dependency(qpsol_);
   }
 
-  void Feasiblesqpmethod::codegen_body(CodeGenerator& g) const {
+  void Feasiblesqpmethod::codegen_body(CodeGenerator& g, const Instance& inst) const {
     g.add_auxiliary(CodeGenerator::AUX_FEASIBLESQPMETHOD);
     codegen_body_enter(g);
     // From nlpsol
