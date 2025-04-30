@@ -1051,8 +1051,8 @@ namespace casadi {
     return s.str();
   }
 
-  std::string CodeGenerator::array(const string& type, const string& name, casadi_int len,
-    const string& def) {
+  std::string CodeGenerator::array(const std::string& type, const std::string& name, casadi_int len,
+    const std::string& def) {
   return array(type, name, str(len), def);
   }
 
