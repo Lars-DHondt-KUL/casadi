@@ -843,7 +843,7 @@ void IpoptInterface::codegen_declarations(CodeGenerator& g, const Instance& inst
   g << "d->arg[0] = x;\n";
   g << "d->arg[1] = d->nlp->p;\n";
   g << "d->res[0] = g;\n";
-  flag = g(get_function(name), "d->arg", "d->res", "d->iw", "d->w", "false");
+  flag = g(get_function(name), "d->arg", "d->res", "d->iw", "d->w", inst, "false");
   g << "if (" + flag + ") return false;\n";
   g << "return true;\n";
   g.scope_exit();
@@ -860,7 +860,7 @@ void IpoptInterface::codegen_declarations(CodeGenerator& g, const Instance& inst
   g << "d->arg[1] = d->nlp->p;\n";
   g << "d->res[0] = 0;\n";
   g << "d->res[1] = grad_f;\n";
-  flag = g(get_function(name), "d->arg", "d->res", "d->iw", "d->w", "false");
+  flag = g(get_function(name), "d->arg", "d->res", "d->iw", "d->w", inst, "false");
   g << "if (" + flag + ") return false;\n";
   g << "return true;\n";
   g.scope_exit();
@@ -880,7 +880,7 @@ void IpoptInterface::codegen_declarations(CodeGenerator& g, const Instance& inst
   g << "d->arg[1] = d->nlp->p;\n";
   g << "d->res[0] = 0;\n";
   g << "d->res[1] = values;\n";
-  flag = g(get_function(name), "d->arg", "d->res", "d->iw", "d->w", "false");
+  flag = g(get_function(name), "d->arg", "d->res", "d->iw", "d->w", inst, "false");
   g << "if (" + flag + ") return false;\n";
   g << "} else {\n";
   g << "casadi_ipopt_sparsity(d->prob->sp_a, iRow, jCol);\n";
@@ -904,7 +904,7 @@ void IpoptInterface::codegen_declarations(CodeGenerator& g, const Instance& inst
     g << "d->arg[2] = &obj_factor;\n";
     g << "d->arg[3] = lambda;\n";
     g << "d->res[0] = values;\n";
-    flag = g(get_function(name), "d->arg", "d->res", "d->iw", "d->w", "false");
+    flag = g(get_function(name), "d->arg", "d->res", "d->iw", "d->w", inst, "false");
     g << "if (" + flag + ") return false;\n";
     g << "return true;\n";
     g << "} else {\n";
