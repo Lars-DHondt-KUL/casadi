@@ -187,7 +187,7 @@ ClarabelInterface::~ClarabelInterface() {
   clear_mem();
 }
 
-void ClarabelInterface::codegen_body(CodeGenerator& g) const {
+void ClarabelInterface::codegen_body(CodeGenerator& g, const Instance& inst) const {
   qp_codegen_body(g);
   g.add_auxiliary(CodeGenerator::AUX_PROJECT);
   g.add_auxiliary(CodeGenerator::AUX_SCAL);

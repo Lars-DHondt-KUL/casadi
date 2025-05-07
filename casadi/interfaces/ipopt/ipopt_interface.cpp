@@ -827,7 +827,7 @@ void IpoptInterface::codegen_declarations(CodeGenerator& g, const Instance& inst
   g << "d->arg[0] = x;\n";
   g << "d->arg[1] = d->nlp->p;\n";
   g << "d->res[0] = obj_value;\n";
-  std::string flag = g(get_function(name), "d->arg", "d->res", "d->iw", "d->w", "false");
+  std::string flag = g(get_function(name), "d->arg", "d->res", "d->iw", "d->w", inst, "false");
   g << "if (" + flag + ") return false;\n";
   g << "return true;\n";
   g.scope_exit();

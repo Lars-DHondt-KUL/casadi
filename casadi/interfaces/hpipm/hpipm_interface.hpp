@@ -134,7 +134,7 @@ namespace casadi {
     void set_hpipm_prob(CodeGenerator& g) const;
 
     /** \brief Generate code for the function body */
-    void codegen_body(CodeGenerator& g) const override;
+    void codegen_body(CodeGenerator& g, const Instance& inst) const override;
 
     /** \brief  Initialize */
     void init(const Dict& opts) override;

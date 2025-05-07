@@ -780,7 +780,7 @@ namespace casadi {
   }
 
 
-  void HpipmInterface::codegen_body(CodeGenerator& g) const {
+  void HpipmInterface::codegen_body(CodeGenerator& g, const Instance& inst) const {
     qp_codegen_body(g);
     g.add_auxiliary(CodeGenerator::AUX_PROJECT);
     g.add_auxiliary(CodeGenerator::AUX_SCAL);

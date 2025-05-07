@@ -225,7 +225,7 @@ namespace casadi {
     clear_mem();
   }
 
-  void DaqpInterface::codegen_body(CodeGenerator& g) const {
+  void DaqpInterface::codegen_body(CodeGenerator& g, const Instance& inst) const {
     qp_codegen_body(g);
     g.add_auxiliary(CodeGenerator::AUX_DENSIFY);
     g.add_auxiliary(CodeGenerator::AUX_COPY);

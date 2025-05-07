@@ -97,7 +97,7 @@ namespace casadi {
     void set_daqp_prob(CodeGenerator& g) const;
 
     /** \brief Generate code for the function body */
-    void codegen_body(CodeGenerator& g) const override;
+    void codegen_body(CodeGenerator& g, const Instance& inst) const override;
 
     /** \brief Codegen decref for init_mem*/
     void codegen_init_mem(CodeGenerator& g) const override;
