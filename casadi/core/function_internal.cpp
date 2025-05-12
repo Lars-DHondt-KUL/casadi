@@ -116,7 +116,7 @@ namespace casadi {
     sz_iw_per_ = 0;
     sz_w_per_ = 0;
     dump_count_ = 0;
-    align_w_ = 64;
+    align_w_ = 1;
   }
 
   ProtoFunction::~ProtoFunction() {
@@ -348,7 +348,11 @@ namespace casadi {
         "Prepopulate the function cache. Default: empty"}},
       {"external_transform",
        {OT_VECTORVECTOR,
-        "List of external_transform instruction arguments. Default: empty"}}
+        "List of external_transform instruction arguments. Default: empty"}},
+      {"align_num_bytes",
+       {OT_INT,
+        "Align data structures so their base memory address is a multiple "
+        "of this number of bytes. Default: 1"}}
      }
   };
 
@@ -417,6 +421,7 @@ namespace casadi {
     opts["dump_dir"] = dump_dir_;
     opts["dump_format"] = dump_format_;
     opts["dump"] = dump_;
+    opts["align_num_bytes"] = align_w_;
     return opts;
   }
 
@@ -542,6 +547,8 @@ namespace casadi {
         is_diff_out_ = op.second;
       } else if (op.first=="cache") {
         cache_init_ = op.second;
+      } else if (op.first=="align_num_bytes") {
+        align_w_ = op.second;
       }
     }
 
