@@ -3906,7 +3906,7 @@ namespace casadi {
 
   void FunctionInternal::serialize_body(SerializingStream& s) const {
     ProtoFunction::serialize_body(s);
-    s.version("FunctionInternal", 6);
+    s.version("FunctionInternal", 7);
     s.pack("FunctionInternal::is_diff_in", is_diff_in_);
     s.pack("FunctionInternal::is_diff_out", is_diff_out_);
     s.pack("FunctionInternal::sp_in", sparsity_in_);
@@ -3983,7 +3983,7 @@ namespace casadi {
   }
 
   FunctionInternal::FunctionInternal(DeserializingStream& s) : ProtoFunction(s) {
-    int version = s.version("FunctionInternal", 1, 6);
+    int version = s.version("FunctionInternal", 1, 7);
     s.unpack("FunctionInternal::is_diff_in", is_diff_in_);
     s.unpack("FunctionInternal::is_diff_out", is_diff_out_);
     s.unpack("FunctionInternal::sp_in", sparsity_in_);
@@ -4091,7 +4091,7 @@ namespace casadi {
     checkout_ = nullptr;
     release_ = nullptr;
     dump_count_ = 0;
-    if (version>=2) {
+    if (version>=7) {
       s.unpack("FunctionInternal::align_w", align_w_);
     } else {
       align_w_ = 1;
