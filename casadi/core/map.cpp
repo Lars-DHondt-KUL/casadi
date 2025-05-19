@@ -320,18 +320,6 @@ namespace casadi {
                   const std::vector<std::string>& inames,
                   const std::vector<std::string>& onames,
                   const Dict& opts) const {
-    // Options
-    bool enable_jacobian = false;
-    for (auto&& op : opts) {
-      if (op.first == "enable_jacobian") {
-        enable_jacobian = op.second;
-      }
-    }
-
-    if (!enable_jacobian) {
-      return FunctionInternal::get_jacobian(name, inames, onames, opts);
-    }
-
     // Generate map of derivative
     Function df = f_.jacobian();
     Function dm = df.map(n_, parallelization());
