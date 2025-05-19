@@ -177,6 +177,17 @@ namespace casadi {
                          const Dict& opts) const override;
     ///@}
 
+    ///@{
+    /** \brief Return Jacobian of all input elements with respect to all output elements
+
+        \identifier{} */
+    bool has_jacobian() const override { return true;}
+    Function get_jacobian(const std::string& name,
+                          const std::vector<std::string>& inames,
+                          const std::vector<std::string>& onames,
+                          const Dict& opts) const override;
+    ///@}
+
     /** Obtain information about node */
     Dict info() const override { return {{"f", f_}, {"n", n_}}; }
 

@@ -315,6 +315,57 @@ namespace casadi {
     return Function(name, arg, res, inames, onames, options);
   }
 
+  Function Map
+  ::get_jacobian(const std::string& name,
+                  const std::vector<std::string>& inames,
+                  const std::vector<std::string>& onames,
+                  const Dict& opts) const {
+    // Options
+    bool enable_jacobian = false;
+    for (auto&& op : opts) {
+      if (op.first == "enable_jacobian") {
+        enable_jacobian = op.second;
+      }
+    }
+
+    if (!enable_jacobian) {
+      return FunctionInternal::get_jacobian(name, inames, onames, opts);
+    }
+
+    // Generate map of derivative
+    Function df = f_.jacobian();
+    Function dm = df.map(n_, parallelization());
+
+    // Input expressions
+    std::vector<MX> arg = dm.mx_in();
+    
+    // Get output expressions
+    std::vector<MX> res = dm(arg);
+
+    // Reorder outputs
+    std::vector<MX>::iterator it=res.begin();
+    std::vector<casadi_int> offset;
+    std::vector<MX> res_i;
+    for (casadi_int i=0; i<n_out_; ++i; ++it) {
+      casadi_int sz = f_.size2_out(i);
+      offset.clear();
+      for (casadi_int j=0; j<n_; ++j){
+        offset.push_back(sz*j);
+      }
+      offset.push_back(sz*n_);
+
+      res_i = horzsplit(*it, offset);
+      *it = (*it)(diagcat(res_i));
+
+    }
+
+    Dict options = opts;
+    options["allow_duplicate_io_names"] = true;
+
+    // Construct return function
+    return Function(name, arg, res, inames, onames, options);
+  }
+
   int Map::eval(const double** arg, double** res, casadi_int* iw, double* w, void* mem) const {
     // This checkout/release dance is an optimization.
     // Could also use the thread-safe variant f_(arg1, res1, iw, w)
