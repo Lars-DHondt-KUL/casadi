@@ -335,7 +335,7 @@ namespace casadi {
     std::vector<casadi_int> offset;
     std::vector<MX> res_i;
     for (casadi_int i=0; i<n_out_; ++i, ++it) {
-      casadi_int sz = dm.size2_out(i);
+      casadi_int sz = df.size2_out(i);
       offset.clear();
       for (casadi_int j=0; j<n_; ++j) {
         offset.push_back(sz*j);
