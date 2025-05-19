@@ -338,7 +338,7 @@ namespace casadi {
 
     // Input expressions
     std::vector<MX> arg = dm.mx_in();
-    
+
     // Get output expressions
     std::vector<MX> res = dm(arg);
 
@@ -346,10 +346,10 @@ namespace casadi {
     std::vector<MX>::iterator it=res.begin();
     std::vector<casadi_int> offset;
     std::vector<MX> res_i;
-    for (casadi_int i=0; i<n_out_; ++i; ++it) {
+    for (casadi_int i=0; i<n_out_; ++i, ++it) {
       casadi_int sz = f_.size2_out(i);
       offset.clear();
-      for (casadi_int j=0; j<n_; ++j){
+      for (casadi_int j=0; j<n_; ++j) {
         offset.push_back(sz*j);
       }
       offset.push_back(sz*n_);
