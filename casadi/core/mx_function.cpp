@@ -439,7 +439,7 @@ namespace casadi {
     std::vector<size_t> align(worksize);
     get_align(algorithm_, align);
     // Re-order work vector with large alignments upfront
-    reorder_align(algorithm_, align);
+    //reorder_align(algorithm_, align);
 
     // Max alignment for io related work vector elements
     size_t align_w_io = align.empty() ? 1 : *std::max_element(align.begin(), align.end());
