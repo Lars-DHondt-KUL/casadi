@@ -181,7 +181,7 @@ namespace casadi {
 
     /// Alignment (bytes) for specific output argument
     virtual size_t align_out(casadi_int oind) const { return 64; }
-    
+
     /// Alignment (bytes) for specific input argument
     size_t align_w() const override;
 
