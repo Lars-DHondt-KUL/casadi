@@ -116,7 +116,7 @@ namespace casadi {
     sz_iw_per_ = 0;
     sz_w_per_ = 0;
     dump_count_ = 0;
-    align_w_ = 64;
+    align_w_ = 1;
   }
 
   ProtoFunction::~ProtoFunction() {
